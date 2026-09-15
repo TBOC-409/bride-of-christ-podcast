@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import Image from "next/image";
 import Link from "next/link";
+import { InstallApp } from "@/components/install-app";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -17,6 +18,8 @@ export const metadata: Metadata = {
   description,
   icons: { icon: "/icon-192.png", apple: "/icon-192.png" },
   openGraph: { siteName, title: siteName, description, type: "website", images: ["/icon-512.png"] },
+  // Lets iPhones open the home-screen shortcut full screen, like an app.
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "Bride Radio" },
 };
 
 export const viewport: Viewport = { themeColor: "#0ea5e9" };
@@ -26,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={geistSans.variable}>
       <body className="site-public-page min-h-screen text-slate-900">
         <header className="sticky top-0 z-50 border-b border-white/60 bg-sky-50/75 shadow-sm shadow-sky-100/50 backdrop-blur-2xl">
-          <div className="mx-auto flex h-16 max-w-5xl items-center px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
             <Link href="/" className="flex min-w-0 items-center gap-3" aria-label={`${siteName} home`}>
               <Image
                 src="/logo.png"
@@ -43,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </span>
               </span>
             </Link>
+            <InstallApp />
           </div>
         </header>
         <main>{children}</main>
