@@ -2,101 +2,146 @@
 
 import { Check, Clock, Download, NotebookPen, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { NOTE_PREFIX, dayKey, dayLabel, isDayKey } from "@/lib/days";
+
+/** Every day that has notes saved in this browser, newest first. */
+function storedDays(): string[] {
+  const days: string[] = [];
+  for (let index = 0; index < window.localStorage.length; index++) {
+    const key = window.localStorage.key(index);
+    if (!key?.startsWith(NOTE_PREFIX)) continue;
+    const day = key.slice(NOTE_PREFIX.length);
+    if (isDayKey(day) && window.localStorage.getItem(key)) days.push(day);
+  }
+  return days.sort().reverse();
+}
 
 /**
- * A private notepad for a listener to jot down what they hear.
+ * A private notepad with a fresh page for each day's programme.
  *
- * Notes stay in the listener's own browser and are never sent to the church.
- * That keeps it usable with no sign-in and nothing to administer, at the cost
- * of notes not following someone to another device. Listeners can save their
- * own notes to a file: the restriction is on the audio, not on their writing.
+ * Notes stay in the listener's own browser and never reach the church, so there
+ * is no sign-in and nothing to administer. Earlier days remain available to
+ * reopen, save to a file or delete.
  */
-export function PodcastNotepad({ sessionId, sessionTitle }: { sessionId: string; sessionTitle: string }) {
-  const storageKey = `boc-podcast-notes-${sessionId}`;
+export function PodcastNotepad() {
+  const [today] = useState(dayKey);
+  const [day, setDay] = useState(today);
   const [notes, setNotes] = useState("");
+  const [days, setDays] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
   const area = useRef<HTMLTextAreaElement | null>(null);
   const loaded = useRef(false);
+  const currentDay = useRef(today);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   /**
-   * Restore saved notes once the textarea mounts.
-   *
-   * Done in a ref callback rather than an effect: the server and the first
-   * client render both produce an empty pad, so hydration matches, and the
-   * stored text arrives immediately afterwards. Storage can also be
-   * unavailable (private windows, blocked site data), and a notepad is a
-   * convenience, so failing to reach it must never break the page.
+   * Load saved notes once the textarea mounts. A ref callback rather than an
+   * effect: server and first client render both show an empty pad, so hydration
+   * matches, and storage may be unavailable, which must not break the page.
    */
-  const attachArea = useCallback((element: HTMLTextAreaElement | null) => {
-    area.current = element;
-    if (!element || loaded.current) return;
-    loaded.current = true;
-    try {
-      const stored = window.localStorage.getItem(storageKey);
-      if (stored) setNotes(stored);
-    } catch {
-      /* start from an empty pad */
-    }
-  }, [storageKey]);
+  const attachArea = useCallback(
+    (element: HTMLTextAreaElement | null) => {
+      area.current = element;
+      if (!element || loaded.current) return;
+      loaded.current = true;
+      try {
+        setDays(storedDays());
+        setNotes(window.localStorage.getItem(NOTE_PREFIX + today) ?? "");
+      } catch {
+        /* storage unavailable: start with an empty pad */
+      }
+    },
+    [today],
+  );
 
-  const persist = useCallback((value: string) => {
+  const persist = useCallback((target: string, value: string) => {
     try {
-      if (value) window.localStorage.setItem(storageKey, value);
-      else window.localStorage.removeItem(storageKey);
+      const key = NOTE_PREFIX + target;
+      if (value.trim()) window.localStorage.setItem(key, value);
+      else window.localStorage.removeItem(key);
+      setDays(storedDays());
       setSaved(true);
     } catch {
       setSaved(false);
     }
-  }, [storageKey]);
+  }, []);
+
+  // Keep the last keystrokes if the tab closes mid-save. Only once notes have
+  // loaded, or an empty pad could overwrite a day that was never opened.
+  useEffect(() => {
+    const flush = () => {
+      if (loaded.current && area.current) persist(currentDay.current, area.current.value);
+    };
+    window.addEventListener("pagehide", flush);
+    return () => window.removeEventListener("pagehide", flush);
+  }, [persist]);
 
   function update(value: string) {
     setNotes(value);
     setSaved(false);
     clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => persist(value), 500);
+    const target = currentDay.current;
+    saveTimer.current = setTimeout(() => persist(target, value), 500);
   }
 
-  // Don't lose the last few keystrokes if the tab closes mid-debounce.
-  useEffect(() => {
-    const flush = () => persist(area.current?.value ?? "");
-    window.addEventListener("pagehide", flush);
-    return () => { window.removeEventListener("pagehide", flush); clearTimeout(saveTimer.current); };
-  }, [persist]);
+  function openDay(next: string) {
+    if (next === currentDay.current) return;
+    clearTimeout(saveTimer.current);
+    if (area.current) persist(currentDay.current, area.current.value);
+    currentDay.current = next;
+    setDay(next);
+    setSaved(false);
+    try {
+      setNotes(window.localStorage.getItem(NOTE_PREFIX + next) ?? "");
+    } catch {
+      setNotes("");
+    }
+  }
 
-  /** Drop the wall-clock time at the cursor, so a note can be found again later. */
   function stampTime() {
     const stamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    const el = area.current;
-    const at = el?.selectionStart ?? notes.length;
+    const element = area.current;
+    const at = element?.selectionStart ?? notes.length;
     const needsBreak = at > 0 && notes[at - 1] !== "\n";
     const insert = `${needsBreak ? "\n" : ""}[${stamp}] `;
-    const next = notes.slice(0, at) + insert + notes.slice(at);
-    update(next);
+    update(notes.slice(0, at) + insert + notes.slice(at));
     requestAnimationFrame(() => {
-      el?.focus();
-      el?.setSelectionRange(at + insert.length, at + insert.length);
+      element?.focus();
+      element?.setSelectionRange(at + insert.length, at + insert.length);
     });
   }
 
   function saveToFile() {
-    const stamp = new Date().toISOString().slice(0, 10);
-    const safeTitle = sessionTitle.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").toLowerCase();
-    const blob = new Blob([`${sessionTitle}\n${stamp}\n\n${notes}\n`], { type: "text/plain;charset=utf-8" });
+    const blob = new Blob([`The Bride of Christ Podcast\n${dayLabel(day, today)} (${day})\n\n${notes}\n`], {
+      type: "text/plain;charset=utf-8",
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${safeTitle || "session"}-notes-${stamp}.txt`;
+    link.download = `podcast-notes-${day}.txt`;
     link.click();
     URL.revokeObjectURL(url);
   }
 
-  function clearNotes() {
-    if (!window.confirm("Clear your notes for this session? This cannot be undone.")) return;
-    update("");
+  function deleteDay() {
+    if (!window.confirm(`Delete your notes for ${dayLabel(day, today).toLowerCase()}? This cannot be undone.`)) return;
+    clearTimeout(saveTimer.current);
+    try {
+      window.localStorage.removeItem(NOTE_PREFIX + day);
+    } catch {
+      /* nothing stored to remove */
+    }
+    setNotes("");
+    setSaved(false);
+    try {
+      setDays(storedDays());
+    } catch {
+      setDays([]);
+    }
     area.current?.focus();
   }
 
+  const choices = Array.from(new Set([today, day, ...days])).sort().reverse();
   const words = notes.trim() ? notes.trim().split(/\s+/).length : 0;
 
   return (
@@ -107,15 +152,40 @@ export function PodcastNotepad({ sessionId, sessionTitle }: { sessionId: string;
           Your notes
         </h2>
         <p aria-live="polite" className="text-xs font-medium text-slate-500">
-          {saved ? <span className="inline-flex items-center gap-1 text-emerald-700"><Check className="h-3.5 w-3.5" aria-hidden />Saved</span> : notes ? "Typing…" : ""}
+          {saved ? (
+            <span className="inline-flex items-center gap-1 text-emerald-700">
+              <Check className="h-3.5 w-3.5" aria-hidden />Saved
+            </span>
+          ) : notes ? (
+            "Typing…"
+          ) : (
+            ""
+          )}
         </p>
       </div>
 
-      <p className="mt-1 text-xs leading-5 text-slate-500">
-        Saved privately in this browser as you type. Only you can see them, and they stay on this device.
+      <div className="mt-3">
+        <label className="sr-only" htmlFor="notes-day">Choose which day&apos;s notes to show</label>
+        <select
+          id="notes-day"
+          value={day}
+          onChange={(event) => openDay(event.target.value)}
+          className="w-full rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-sky-500 sm:w-auto"
+        >
+          {choices.map((choice) => (
+            <option key={choice} value={choice}>
+              {dayLabel(choice, today)}
+              {choice !== today && !days.includes(choice) ? " (empty)" : ""}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <p className="mt-2 text-xs leading-5 text-slate-500">
+        A fresh page each day. Saved privately in this browser as you type, and only you can see them.
       </p>
 
-      <label className="sr-only" htmlFor="podcast-notes">Your notes for this session</label>
+      <label className="sr-only" htmlFor="podcast-notes">Your notes</label>
       <textarea
         id="podcast-notes"
         ref={attachArea}
@@ -127,16 +197,18 @@ export function PodcastNotepad({ sessionId, sessionTitle }: { sessionId: string;
       />
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button type="button" onClick={stampTime} className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:border-sky-400 disabled:opacity-60">
+        <button type="button" onClick={stampTime} className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:border-sky-400">
           <Clock className="h-3.5 w-3.5" aria-hidden />Add time
         </button>
         <button type="button" onClick={saveToFile} disabled={!notes} className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:border-sky-400 disabled:opacity-40">
           <Download className="h-3.5 w-3.5" aria-hidden />Save notes
         </button>
-        <button type="button" onClick={clearNotes} disabled={!notes} className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-red-700 hover:border-red-300 disabled:opacity-40">
-          <Trash2 className="h-3.5 w-3.5" aria-hidden />Clear
+        <button type="button" onClick={deleteDay} disabled={!notes} className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-red-700 hover:border-red-300 disabled:opacity-40">
+          <Trash2 className="h-3.5 w-3.5" aria-hidden />Delete
         </button>
-        <span className="ml-auto text-xs text-slate-400">{words} {words === 1 ? "word" : "words"}</span>
+        <span className="ml-auto text-xs text-slate-400">
+          {words} {words === 1 ? "word" : "words"}
+        </span>
       </div>
     </section>
   );
