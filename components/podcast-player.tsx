@@ -4,12 +4,31 @@ import Image from "next/image";
 import { Loader2, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { StreamStatus } from "@/lib/icecast";
+import { HEARTBEAT_MS } from "@/lib/listeners";
 
 /** How often "now playing" refreshes while the page is open. */
 const POLL_MS = 20_000;
 /** Reconnection attempts when the stream drops. */
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 3_000;
+/** Browser storage key for the anonymous listener ID. */
+const LISTENER_KEY = "boc-podcast-listener";
+
+/**
+ * One anonymous ID per browser, so two tabs playing at once count as one
+ * listener. If storage is blocked, the ID lives only as long as the page.
+ */
+function listenerId(): string {
+  try {
+    const saved = window.localStorage.getItem(LISTENER_KEY);
+    if (saved && /^[A-Za-z0-9-]{8,64}$/.test(saved)) return saved;
+    const fresh = crypto.randomUUID();
+    window.localStorage.setItem(LISTENER_KEY, fresh);
+    return fresh;
+  } catch {
+    return crypto.randomUUID();
+  }
+}
 
 type PlayState = "idle" | "connecting" | "playing" | "reconnecting" | "error";
 
@@ -40,6 +59,7 @@ export function PodcastPlayer({ initialStatus }: { initialStatus: StreamStatus }
   /** True from pressing Listen until pressing Stop, so drops can be retried. */
   const wantPlaying = useRef(false);
   const retries = useRef(0);
+  const listenerRef = useRef<string | null>(null);
   const [status, setStatus] = useState<StreamStatus>(initialStatus);
   const [state, setState] = useState<PlayState>("idle");
   const [message, setMessage] = useState("");
@@ -84,6 +104,40 @@ export function PodcastPlayer({ initialStatus }: { initialStatus: StreamStatus }
       }
     };
   }, []);
+
+  // Counted as listening while audio plays, and while reconnecting after a
+  // drop, so a brief stall does not make someone vanish from the count.
+  const listening = state === "playing" || state === "reconnecting";
+
+  // Check in with the site while listening, and say so when stopping or
+  // leaving. The site counts anyone who checked in recently.
+  useEffect(() => {
+    if (!listening) return;
+    listenerRef.current ??= listenerId();
+    const id = listenerRef.current;
+    const checkIn = (playing: boolean, closing = false) => {
+      const body = JSON.stringify({ id, playing });
+      if (closing && typeof navigator.sendBeacon === "function") {
+        navigator.sendBeacon("/api/listeners", body);
+        return;
+      }
+      void fetch("/api/listeners", {
+        method: "POST",
+        body,
+        keepalive: true,
+        headers: { "Content-Type": "application/json" },
+      }).catch(() => {});
+    };
+    checkIn(true);
+    const timer = setInterval(() => checkIn(true), HEARTBEAT_MS);
+    const leaving = () => checkIn(false, true);
+    window.addEventListener("pagehide", leaving);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("pagehide", leaving);
+      checkIn(false, true);
+    };
+  }, [listening]);
 
   function release() {
     const element = audio.current;
