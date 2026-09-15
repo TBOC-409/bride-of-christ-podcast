@@ -9,7 +9,7 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3001").replace(/\/$/, "");
 const siteName = "The Bride of Christ Podcast";
 const description =
-  "Live church programmes from The Bride of Christ, with a private notepad to capture what speaks to you.";
+  "The Bride of Christ church radio, live around the clock, with a private notepad to capture what speaks to you.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

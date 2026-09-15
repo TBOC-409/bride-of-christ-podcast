@@ -1,24 +1,29 @@
 /**
- * Reading the church's Icecast stream.
+ * Reading the church's radio stream.
  *
- * There is one listening address for every programme, set as STREAM_URL. The
- * site never needs Icecast's source or admin password: those belong only in
- * the broadcasting software.
+ * One listening address, STREAM_URL, carries everything: live church programmes
+ * and the music that plays between them. The stream is never meant to stop, so
+ * there is no on air or off air, only whether it can be reached and what is
+ * playing now. The site never needs a source or admin password; those belong
+ * only in the broadcasting software.
  *
- * Whether something is on air comes from Icecast itself. Its status page
- * (/status-json.xsl) lists every mount a broadcaster is currently connected
- * to. Some hosts switch that page off, so when it cannot be read the site falls
- * back to opening the stream and checking audio actually comes back.
+ * On a self-hosted Icecast both answers come from its status page
+ * (/status-json.xsl), along with a listener count. Hosted services such as
+ * Zeno.fm do not publish that page, so the site opens the stream itself,
+ * confirms audio comes back, and reads the "now playing" text the stream
+ * carries alongside the audio (ICY metadata).
  */
 
 export type StreamStatus = {
   /** False until STREAM_URL is set on this site. */
   configured: boolean;
-  live: boolean;
-  /** The programme title the broadcasting software sends, when it sends one. */
+  /** The stream can be reached and is sending audio. */
+  online: boolean;
+  /** What is playing now, a programme or a song, as the stream announces it. */
   title: string | null;
+  /** Only available from a self-hosted Icecast status page. */
   listeners: number | null;
-  detectedBy: "status-page" | "connection-test" | null;
+  detectedBy: "status-page" | "stream" | null;
   checkedAt: string;
   /** Setup mistakes that stop the stream playing for some or all listeners. */
   problems: string[];
@@ -33,12 +38,15 @@ export type IcecastSource = {
 };
 
 const STATUS_TIMEOUT_MS = 4_000;
-const PROBE_TIMEOUT_MS = 5_000;
-/** Many listeners poll at once; Icecast only needs asking every few seconds. */
+/** Long enough to receive the first title, which arrives after about a second of audio. */
+const PROBE_TIMEOUT_MS = 7_000;
+/** Titles change every few minutes; Icecast only needs asking every few seconds. */
 const CACHE_MS = 10_000;
+/** A metadata block can be at most 255 x 16 bytes. */
+const MAX_METADATA_BYTES = 255 * 16;
 
 /** Values Icecast reports when the broadcaster never named the stream. */
-const PLACEHOLDER_TITLES = new Set(["", "unspecified name", "unspecified description", "no name", "untitled"]);
+const PLACEHOLDER_TITLES = new Set(["", "-", "unspecified name", "unspecified description", "no name", "untitled"]);
 
 export function streamUrl(): string | null {
   return process.env.STREAM_URL?.trim() || null;
@@ -61,7 +69,7 @@ export function statusUrlFor(stream: string): string {
 }
 
 /**
- * The live source for our mount, if a broadcaster is connected to it.
+ * The source for our mount on an Icecast status page, if it is listed.
  *
  * Icecast returns `source` as a single object when one mount is live, an array
  * when several are, and leaves it out when none are. Mounts are matched by path
@@ -76,18 +84,68 @@ export function liveSourceFor(payload: unknown, stream: string): IcecastSource |
   return sources.find((source) => typeof source?.listenurl === "string" && mountOf(source.listenurl) === mount) ?? null;
 }
 
+/** Web address endings song-download sites use. Kept to real ones, so a title
+ * like "Hymn | St.Anne" is not mistaken for a website. */
+const SITE_ENDING = "(?:com|net|org|gh|ng|co|io|fm|info|biz|me|tv|uk|africa)";
+/** "[www.site.com]" or "(site.net)" anywhere in the title. */
+const BRACKETED_SITE = new RegExp(
+  `\\s*[[(][^\\])]*(?:www\\.|https?:\\/\\/|\\.${SITE_ENDING}\\b)[^\\])]*[\\])]\\s*`,
+  "gi",
+);
+/** " | www.site.net" or " - site.com" at the end of the title. */
+const SEPARATED_SITE = new RegExp(
+  `\\s*(?:[|•~/–—-]|::)\\s*(?:https?:\\/\\/)?(?:www\\.)?[a-z0-9-]+(?:\\.[a-z0-9-]+)*\\.${SITE_ENDING}\\b\\S*\\s*$`,
+  "i",
+);
+/** A bare " www.site.gh" at the end, with no separator. */
+const BARE_SITE = new RegExp(`\\s+(?:https?:\\/\\/)?www\\.\\S+\\s*$`, "i");
+
+/**
+ * A title fit to show listeners.
+ *
+ * Song files often carry the website they were downloaded from, as in
+ * "Ernest Opoku Junior - My Season [www.ghanagospelsongs.com]" or
+ * "Piesie Esther - Wayε Me Yie | www.ndwompafie.net", both seen on this stream.
+ * Those tags are removed, spacing is tidied, and Icecast's placeholder names are
+ * hidden. Credits such as "(feat. ...)" and "(Live)" are kept.
+ */
+export function tidyTitle(text: string | null | undefined): string | null {
+  if (typeof text !== "string") return null;
+  const tidy = text
+    .replace(BRACKETED_SITE, " ")
+    .replace(SEPARATED_SITE, "")
+    .replace(BARE_SITE, "")
+    .replace(/\s+/g, " ")
+    .replace(/\s+-\s*$/, "")
+    .trim();
+  if (PLACEHOLDER_TITLES.has(tidy.toLowerCase())) return null;
+  return tidy.slice(0, 200);
+}
+
 export function cleanTitle(source: IcecastSource | null): string | null {
-  for (const candidate of [source?.title, source?.server_name]) {
-    const text = typeof candidate === "string" ? candidate.trim() : "";
-    if (text && !PLACEHOLDER_TITLES.has(text.toLowerCase())) return text.slice(0, 200);
-  }
-  return null;
+  return tidyTitle(source?.title) ?? tidyTitle(source?.server_name);
+}
+
+/**
+ * The StreamTitle value from an ICY metadata block, such as
+ * StreamTitle='God's Love - Choir';StreamUrl='';
+ *
+ * Titles can contain apostrophes, so the value runs to the next "';" rather
+ * than to the next quote.
+ */
+export function parseIcyTitle(block: string): string | null {
+  const marker = "StreamTitle='";
+  const start = block.indexOf(marker);
+  if (start === -1) return null;
+  const from = start + marker.length;
+  const end = block.indexOf("';", from);
+  return end === -1 ? block.slice(from).replace(/'\s*$/, "") : block.slice(from, end);
 }
 
 /** Plain-language setup problems for the stream address and format. */
 export function problemsWith(stream: string, format?: string | null): string[] {
   const problems: string[] = [];
-  let url: URL | null = null;
+  let url: URL;
   try {
     url = new URL(stream);
   } catch {
@@ -95,12 +153,12 @@ export function problemsWith(stream: string, format?: string | null): string[] {
   }
   if (url.protocol === "http:") {
     problems.push(
-      "The stream uses http://. Browsers will not play it inside an HTTPS website, so most listeners will hear nothing. The Icecast server needs HTTPS.",
+      "The stream uses http://. Browsers will not play it inside an HTTPS website, so most listeners will hear nothing. Use the HTTPS listening address.",
     );
   }
   if (!mountOf(stream)) {
     problems.push(
-      "The stream address has no mount name, so it points at the Icecast server rather than the audio. Add the mount, for example /live.",
+      "The stream address has no mount name, so it points at the server rather than the audio. Use the full listening address.",
     );
   }
   if (format && /ogg|opus|vorbis/i.test(format)) {
@@ -111,38 +169,74 @@ export function problemsWith(stream: string, format?: string | null): string[] {
   return problems;
 }
 
-async function probeStream(stream: string): Promise<{ live: boolean; format: string | null }> {
+/**
+ * Read the first "now playing" title from a stream that was requested with
+ * Icy-MetaData: 1. The server sends `icy-metaint` bytes of audio, then one
+ * length byte (times 16), then the metadata text.
+ */
+export async function readIcyTitle(response: Response): Promise<string | null> {
+  const metaint = Number(response.headers.get("icy-metaint"));
+  if (!Number.isInteger(metaint) || metaint <= 0 || metaint > 256_000 || !response.body) return null;
+  const reader = response.body.getReader();
+  let buffered = new Uint8Array(0);
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done || !value) return null;
+      const merged = new Uint8Array(buffered.length + value.length);
+      merged.set(buffered);
+      merged.set(value, buffered.length);
+      buffered = merged;
+      if (buffered.length <= metaint) continue;
+      const length = buffered[metaint] * 16;
+      if (length === 0) return null;
+      if (buffered.length < metaint + 1 + length) {
+        if (buffered.length > metaint + 1 + MAX_METADATA_BYTES) return null;
+        continue;
+      }
+      const block = new TextDecoder().decode(buffered.subarray(metaint + 1, metaint + 1 + length)).replace(/\0+$/, "");
+      return tidyTitle(parseIcyTitle(block));
+    }
+  } catch {
+    return null;
+  } finally {
+    reader.cancel().catch(() => {});
+  }
+}
+
+async function probeStream(stream: string): Promise<{ online: boolean; format: string | null; title: string | null }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   try {
     const response = await fetch(stream, {
       signal: controller.signal,
       cache: "no-store",
-      headers: { "Icy-MetaData": "0" },
+      headers: { "Icy-MetaData": "1" },
     });
     const format = response.headers.get("content-type");
-    const live = response.ok && /^(audio\/|application\/ogg)/i.test(format ?? "");
-    return { live, format };
+    const online = response.ok && /^(audio\/|application\/ogg)/i.test(format ?? "");
+    const title = online ? await readIcyTitle(response) : null;
+    return { online, format, title };
   } catch {
-    return { live: false, format: null };
+    return { online: false, format: null, title: null };
   } finally {
     clearTimeout(timer);
-    // Stop downloading audio as soon as the headers have answered the question.
+    // Stop downloading audio as soon as the question is answered.
     controller.abort();
   }
 }
 
-/** Ask Icecast directly, with no caching. Never throws. */
+/** Ask the stream directly, with no caching. Never throws. */
 export async function readStreamStatus(): Promise<StreamStatus> {
   const checkedAt = new Date().toISOString();
   const stream = streamUrl();
   if (!stream) {
-    return { configured: false, live: false, title: null, listeners: null, detectedBy: null, checkedAt, problems: [] };
+    return { configured: false, online: false, title: null, listeners: null, detectedBy: null, checkedAt, problems: [] };
   }
 
   const addressProblems = problemsWith(stream);
   if (addressProblems.some((problem) => problem.includes("not a valid"))) {
-    return { configured: true, live: false, title: null, listeners: null, detectedBy: null, checkedAt, problems: addressProblems };
+    return { configured: true, online: false, title: null, listeners: null, detectedBy: null, checkedAt, problems: addressProblems };
   }
 
   try {
@@ -152,40 +246,57 @@ export async function readStreamStatus(): Promise<StreamStatus> {
     });
     if (response.ok) {
       const source = liveSourceFor(await response.json(), stream);
-      return {
-        configured: true,
-        live: Boolean(source),
-        title: cleanTitle(source),
-        listeners: typeof source?.listeners === "number" ? source.listeners : null,
-        detectedBy: "status-page",
-        checkedAt,
-        problems: problemsWith(stream, source?.server_type),
-      };
+      if (source) {
+        return {
+          configured: true,
+          online: true,
+          title: cleanTitle(source),
+          listeners: typeof source.listeners === "number" ? source.listeners : null,
+          detectedBy: "status-page",
+          checkedAt,
+          problems: problemsWith(stream, source.server_type),
+        };
+      }
+      // Not listed. Music between programmes is often served from a fallback
+      // mount, which the status page does not show under ours, so the stream
+      // itself decides.
     }
   } catch {
-    // Status page switched off, unreachable, or returning broken JSON, which
-    // older Icecast versions do when a title contains quotes. Test the stream.
+    // No status page (as on Zeno.fm), unreachable, or the broken JSON older
+    // Icecast versions return when a title contains quotes.
   }
 
   const probe = await probeStream(stream);
   return {
     configured: true,
-    live: probe.live,
-    title: null,
+    online: probe.online,
+    title: probe.title,
     listeners: null,
-    detectedBy: "connection-test",
+    detectedBy: "stream",
     checkedAt,
     problems: problemsWith(stream, probe.format),
   };
 }
 
-let cached: { at: number; value: Promise<StreamStatus> } | null = null;
+let latest: StreamStatus | null = null;
+let refreshedAt = 0;
+let refreshing: Promise<StreamStatus> | null = null;
 
-/** The stream's status, asked of Icecast at most once every few seconds. */
+/**
+ * The stream's status, checked at most every few seconds.
+ *
+ * Once a first answer exists it is returned straight away while a fresh one is
+ * fetched in the background, so a visitor never waits on the stream to load
+ * the page. Only the very first request waits.
+ */
 export function getStreamStatus(): Promise<StreamStatus> {
-  const now = Date.now();
-  if (!cached || now - cached.at >= CACHE_MS) {
-    cached = { at: now, value: readStreamStatus() };
+  if (Date.now() - refreshedAt >= CACHE_MS && !refreshing) {
+    refreshing = readStreamStatus().then((value) => {
+      latest = value;
+      refreshedAt = Date.now();
+      refreshing = null;
+      return value;
+    });
   }
-  return cached.value;
+  return latest ? Promise.resolve(latest) : (refreshing as Promise<StreamStatus>);
 }

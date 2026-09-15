@@ -4,19 +4,23 @@ import { Loader2, Pause, Play, Radio, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { StreamStatus } from "@/lib/icecast";
 
-/** How often the on-air badge checks Icecast while the page is open. */
+/** How often "now playing" refreshes while the page is open. */
 const POLL_MS = 20_000;
-/** Reconnection attempts when the stream drops during a live programme. */
+/** Reconnection attempts when the stream drops. */
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 3_000;
 
 type PlayState = "idle" | "connecting" | "playing" | "reconnecting" | "error";
 
 /**
- * The live player for the church's single Icecast stream.
+ * The player for the church's 24/7 radio.
+ *
+ * The stream never stops: church programmes go out live, with music between
+ * them. So there is no on air or off air, only what is playing now, which the
+ * stream announces and this refreshes while the page is open.
  *
  * Controls are custom because the browser's own audio controls offer a
- * download. The address is fetched when someone presses Listen rather than
+ * download, and the address is fetched when someone presses Listen rather than
  * written into the page. Neither stops a determined listener recording it.
  */
 export function PodcastPlayer({ initialStatus }: { initialStatus: StreamStatus }) {
@@ -30,7 +34,7 @@ export function PodcastPlayer({ initialStatus }: { initialStatus: StreamStatus }
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(0.9);
 
-  // The badge starts from the server's answer and then keeps itself current,
+  // Starts from the server's answer, then keeps "now playing" current,
   // checking again straight away when someone returns to the tab.
   useEffect(() => {
     let cancelled = false;
@@ -56,7 +60,7 @@ export function PodcastPlayer({ initialStatus }: { initialStatus: StreamStatus }
     };
   }, []);
 
-  // Leaving the page closes the connection to Icecast.
+  // Leaving the page closes the connection to the stream.
   useEffect(() => {
     const element = audio.current;
     return () => {
@@ -81,16 +85,16 @@ export function PodcastPlayer({ initialStatus }: { initialStatus: StreamStatus }
   function retryOrGiveUp(reason: string) {
     if (!wantPlaying.current) return;
     release();
-    // Off air, the mount does not exist, so repeated attempts only delay the
-    // honest answer.
-    const limit = status.live ? MAX_RETRIES : 1;
+    // If the station cannot be reached at all, repeated attempts only delay
+    // the honest answer.
+    const limit = status.online ? MAX_RETRIES : 1;
     if (retries.current >= limit) {
       wantPlaying.current = false;
       setState("error");
       setMessage(
-        status.live
+        status.online
           ? `${reason} Press Listen live to try again.`
-          : "Nothing is broadcasting right now. Press Listen live when a programme starts.",
+          : "The radio cannot be reached right now. Please try again in a few minutes.",
       );
       return;
     }
@@ -106,16 +110,17 @@ export function PodcastPlayer({ initialStatus }: { initialStatus: StreamStatus }
     try {
       const response = await fetch("/api/stream", { cache: "no-store" });
       const body = (await response.json().catch(() => ({}))) as { url?: string; error?: string };
-      if (!response.ok || !body.url) throw new Error(body.error ?? "The live stream is not available.");
+      if (!response.ok || !body.url) throw new Error(body.error ?? "The radio is not available.");
       const element = audio.current;
       if (!element || !wantPlaying.current) return;
-      // A fresh query string stops the browser resuming a stale buffer.
+      // A fresh query string stops the browser resuming a stale buffer, and a
+      // fresh request picks up a new token from hosts such as Zeno.fm.
       element.src = `${body.url}${body.url.includes("?") ? "&" : "?"}t=${Date.now()}`;
       element.volume = volume;
       element.muted = muted;
       await element.play();
     } catch (error) {
-      retryOrGiveUp(error instanceof Error ? error.message : "Could not connect to the live stream.");
+      retryOrGiveUp(error instanceof Error ? error.message : "Could not connect to the radio.");
     }
   }
 
@@ -169,33 +174,38 @@ export function PodcastPlayer({ initialStatus }: { initialStatus: StreamStatus }
           if (wantPlaying.current) setMessage("Buffering…");
         }}
         onError={() => retryOrGiveUp("The stream dropped.")}
-        onEnded={() => retryOrGiveUp("The broadcast ended.")}
+        onEnded={() => retryOrGiveUp("The stream ended.")}
       />
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        {status.live ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-red-700">
-            <Radio className="h-3.5 w-3.5 animate-pulse" aria-hidden />On air
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-600">
-            <Radio className="h-3.5 w-3.5" aria-hidden />Off air
-          </span>
-        )}
-        {status.live && status.listeners !== null && (
-          <span className="text-xs font-medium text-slate-500">
-            {status.listeners} {status.listeners === 1 ? "person" : "people"} listening
-          </span>
-        )}
-      </div>
+      {status.configured && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {status.online ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-sky-700">
+              <Radio className="h-3.5 w-3.5 animate-pulse" aria-hidden />Live radio
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-600">
+              <Radio className="h-3.5 w-3.5" aria-hidden />Unavailable
+            </span>
+          )}
+          {status.online && status.listeners !== null && (
+            <span className="text-xs font-medium text-slate-500">
+              {status.listeners} {status.listeners === 1 ? "person" : "people"} listening
+            </span>
+          )}
+        </div>
+      )}
 
-      {status.live && status.title && (
-        <p className="mt-3 text-lg font-semibold leading-snug text-slate-900">{status.title}</p>
+      {status.online && status.title && (
+        <div className="mt-3" aria-live="polite">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Now playing</p>
+          <p className="mt-0.5 text-lg font-semibold leading-snug text-slate-900">{status.title}</p>
+        </div>
       )}
 
       {!status.configured ? (
         <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          The live stream has not been set up yet.
+          The radio has not been set up yet.
         </p>
       ) : (
         <>
@@ -234,9 +244,9 @@ export function PodcastPlayer({ initialStatus }: { initialStatus: StreamStatus }
             </div>
           </div>
 
-          {!status.live && state === "idle" && !message && (
+          {!status.online && state === "idle" && !message && (
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Nothing is broadcasting right now. When a church programme starts, this shows On air.
+              The radio cannot be reached right now. It usually comes back within a few minutes.
             </p>
           )}
 
