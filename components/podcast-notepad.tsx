@@ -145,10 +145,12 @@ export function PodcastNotepad() {
   const words = notes.trim() ? notes.trim().split(/\s+/).length : 0;
 
   return (
-    <section className="site-liquid-glass rounded-2xl p-5 sm:rounded-3xl sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
-          <NotebookPen className="h-5 w-5 text-sky-600" aria-hidden />
+    <section className="site-liquid-glass rounded-3xl p-5 sm:p-6">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2.5 text-base font-semibold text-slate-900">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
+            <NotebookPen className="h-[18px] w-[18px]" aria-hidden />
+          </span>
           Your notes
         </h2>
         <p aria-live="polite" className="text-xs font-medium text-slate-500">
@@ -164,13 +166,13 @@ export function PodcastNotepad() {
         </p>
       </div>
 
-      <div className="mt-3">
+      <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
         <label className="sr-only" htmlFor="notes-day">Choose which day&apos;s notes to show</label>
         <select
           id="notes-day"
           value={day}
           onChange={(event) => openDay(event.target.value)}
-          className="w-full rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-sky-500 sm:w-auto"
+          className="min-h-10 rounded-full border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-800 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
         >
           {choices.map((choice) => (
             <option key={choice} value={choice}>
@@ -179,11 +181,8 @@ export function PodcastNotepad() {
             </option>
           ))}
         </select>
+        <span className="text-xs leading-5 text-slate-500">Private to this browser. A fresh page each day.</span>
       </div>
-
-      <p className="mt-2 text-xs leading-5 text-slate-500">
-        A fresh page each day. Saved privately in this browser as you type, and only you can see them.
-      </p>
 
       <label className="sr-only" htmlFor="podcast-notes">Your notes</label>
       <textarea
@@ -191,22 +190,22 @@ export function PodcastNotepad() {
         ref={attachArea}
         value={notes}
         onChange={(event) => update(event.target.value)}
-        rows={12}
         placeholder="Jot down what stands out as you listen…"
-        className="mt-3 w-full resize-y rounded-xl border border-slate-200 bg-white/90 p-3 text-sm leading-6 text-slate-800 outline-none focus:border-sky-500"
+        className="mt-3 min-h-56 w-full resize-y rounded-2xl border border-slate-200 bg-white/90 p-4 text-[15px] leading-7 text-slate-800 outline-none placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100 sm:min-h-72"
       />
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button type="button" onClick={stampTime} className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:border-sky-400">
+        <button type="button" onClick={stampTime} className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-sky-50 px-3 text-xs font-semibold text-sky-800 transition hover:bg-sky-100">
           <Clock className="h-3.5 w-3.5" aria-hidden />Add time
         </button>
-        <button type="button" onClick={saveToFile} disabled={!notes} className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:border-sky-400 disabled:opacity-40">
+        <button type="button" onClick={saveToFile} disabled={!notes} className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:border-sky-300 disabled:cursor-not-allowed disabled:opacity-50">
           <Download className="h-3.5 w-3.5" aria-hidden />Save notes
         </button>
-        <button type="button" onClick={deleteDay} disabled={!notes} className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-red-700 hover:border-red-300 disabled:opacity-40">
+        <button type="button" onClick={deleteDay} disabled={!notes} className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-red-700 transition hover:border-red-300 disabled:cursor-not-allowed disabled:opacity-50">
           <Trash2 className="h-3.5 w-3.5" aria-hidden />Delete
         </button>
-        <span className="ml-auto text-xs text-slate-400">
+        {/* Its own line on phones, so the three buttons keep to one row. */}
+        <span className="basis-full text-right text-xs tabular-nums text-slate-400 sm:ml-auto sm:basis-auto">
           {words} {words === 1 ? "word" : "words"}
         </span>
       </div>

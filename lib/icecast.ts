@@ -100,6 +100,11 @@ const SEPARATED_SITE = new RegExp(
 /** A bare " www.site.gh" at the end, with no separator. */
 const BARE_SITE = new RegExp(`\\s+(?:https?:\\/\\/)?www\\.\\S+\\s*$`, "i");
 
+/** A raw audio file name, e.g. "enough is enough nana bonsu.wma". */
+const AUDIO_FILE = /\.(?:mp3|wma|m4a|aac|wav|flac|ogg|opus|amr)\s*$/i;
+/** Leading track numbers in a file name: "04 04 ", "01. ", "1-". */
+const TRACK_NUMBERS = /^(?:\d{1,3}(?:\s*[.)\-–_]\s*|\s+))+/;
+
 /**
  * A title fit to show listeners.
  *
@@ -111,13 +116,17 @@ const BARE_SITE = new RegExp(`\\s+(?:https?:\\/\\/)?www\\.\\S+\\s*$`, "i");
  */
 export function tidyTitle(text: string | null | undefined): string | null {
   if (typeof text !== "string") return null;
-  const tidy = text
-    .replace(BRACKETED_SITE, " ")
-    .replace(SEPARATED_SITE, "")
-    .replace(BARE_SITE, "")
-    .replace(/\s+/g, " ")
-    .replace(/\s+-\s*$/, "")
-    .trim();
+  let tidy = text.replace(BRACKETED_SITE, " ").replace(SEPARATED_SITE, "").replace(BARE_SITE, "").trim();
+
+  // Some tracks announce their raw file name. Only then are leading numbers
+  // treated as track numbers, so a programme such as "2 Chronicles 7:14 Prayer"
+  // keeps its number.
+  if (AUDIO_FILE.test(tidy)) {
+    tidy = tidy.replace(AUDIO_FILE, "").replace(/_/g, " ").trim().replace(TRACK_NUMBERS, "");
+    if (/^\d+$/.test(tidy.trim())) return null;
+  }
+
+  tidy = tidy.replace(/\s+/g, " ").replace(/\s+-\s*$/, "").trim();
   if (PLACEHOLDER_TITLES.has(tidy.toLowerCase())) return null;
   return tidy.slice(0, 200);
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { Loader2, Pause, Play, Radio, Volume2, VolumeX } from "lucide-react";
+import Image from "next/image";
+import { Loader2, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { StreamStatus } from "@/lib/icecast";
 
@@ -12,8 +13,19 @@ const RETRY_DELAY_MS = 3_000;
 
 type PlayState = "idle" | "connecting" | "playing" | "reconnecting" | "error";
 
+/** Four bars that move while audio plays and rest when it does not. */
+function Equalizer({ active }: { active: boolean }) {
+  return (
+    <span className="site-eq flex h-5 items-end gap-[3px]" data-active={active} aria-hidden>
+      {[0, 1, 2, 3].map((bar) => (
+        <span key={bar} className="h-full w-[3px] rounded-full bg-sky-500" />
+      ))}
+    </span>
+  );
+}
+
 /**
- * The player for the church's 24/7 radio.
+ * The player for the church's 24/7 radio, and the centrepiece of the page.
  *
  * The stream never stops: church programmes go out live, with music between
  * them. So there is no on air or off air, only what is playing now, which the
@@ -157,9 +169,17 @@ export function PodcastPlayer({ initialStatus }: { initialStatus: StreamStatus }
 
   const busy = state === "connecting" || state === "reconnecting";
   const active = busy || state === "playing";
+  const nowPlaying = !status.configured
+    ? "The radio has not been set up yet."
+    : status.online
+      ? status.title ?? "Live now"
+      : "The radio cannot be reached right now.";
 
   return (
-    <div>
+    <section className="site-liquid-home relative isolate overflow-hidden rounded-3xl border border-white/80 p-5 shadow-[0_30px_80px_rgba(14,116,144,0.16)] sm:p-8">
+      <div className="site-liquid-blob site-liquid-blob-one pointer-events-none opacity-50" aria-hidden />
+      <div className="site-liquid-blob site-liquid-blob-two pointer-events-none opacity-40" aria-hidden />
+
       <audio
         ref={audio}
         preload="none"
@@ -177,89 +197,98 @@ export function PodcastPlayer({ initialStatus }: { initialStatus: StreamStatus }
         onEnded={() => retryOrGiveUp("The stream ended.")}
       />
 
+      <div className="relative flex items-center gap-4">
+        <Image
+          src="/logo.png"
+          alt=""
+          width={72}
+          height={72}
+          priority
+          className="h-16 w-16 shrink-0 rounded-2xl object-cover shadow-lg ring-4 ring-white sm:h-[72px] sm:w-[72px]"
+        />
+        <div className="min-w-0">
+          {status.configured &&
+            (status.online ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white shadow-sm">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" aria-hidden />
+                Live radio
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-200 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-600">
+                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" aria-hidden />
+                Unavailable
+              </span>
+            ))}
+          <h1 className="mt-1.5 text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">The Bride Online Radio</h1>
+          <p className="mt-0.5 text-sm leading-5 text-slate-600">Church programmes most days, gospel music in between.</p>
+        </div>
+      </div>
+
+      <div className="relative mt-6 rounded-2xl bg-white/75 p-4 ring-1 ring-white sm:p-5" aria-live="polite">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Now playing</p>
+          {status.online && <Equalizer active={state === "playing"} />}
+        </div>
+        <p className="mt-1.5 line-clamp-2 text-lg font-semibold leading-snug text-slate-900 sm:text-xl">{nowPlaying}</p>
+        {status.online && status.listeners !== null && (
+          <p className="mt-1 text-xs font-medium text-slate-500">
+            {status.listeners} {status.listeners === 1 ? "person" : "people"} listening
+          </p>
+        )}
+      </div>
+
       {status.configured && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {status.online ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-sky-700">
-              <Radio className="h-3.5 w-3.5 animate-pulse" aria-hidden />Live radio
+        <div className="relative mt-6 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={active ? stop : listen}
+            aria-label={active ? "Stop listening" : "Listen live"}
+            className="inline-flex min-h-14 items-center gap-2.5 rounded-full bg-sky-600 py-2 pl-2 pr-6 text-base font-semibold text-white shadow-[0_12px_32px_rgba(2,132,199,.35)] transition hover:bg-sky-700 active:scale-[0.98]"
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
+              {busy ? (
+                <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+              ) : state === "playing" ? (
+                <Pause className="h-5 w-5" aria-hidden />
+              ) : (
+                <Play className="ml-0.5 h-5 w-5" aria-hidden />
+              )}
             </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-600">
-              <Radio className="h-3.5 w-3.5" aria-hidden />Unavailable
-            </span>
-          )}
-          {status.online && status.listeners !== null && (
-            <span className="text-xs font-medium text-slate-500">
-              {status.listeners} {status.listeners === 1 ? "person" : "people"} listening
-            </span>
-          )}
-        </div>
-      )}
+            {state === "connecting" ? "Connecting…" : state === "reconnecting" ? "Reconnecting…" : state === "playing" ? "Stop" : "Listen live"}
+          </button>
 
-      {status.online && status.title && (
-        <div className="mt-3" aria-live="polite">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Now playing</p>
-          <p className="mt-0.5 text-lg font-semibold leading-snug text-slate-900">{status.title}</p>
-        </div>
-      )}
-
-      {!status.configured ? (
-        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          The radio has not been set up yet.
-        </p>
-      ) : (
-        <>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
+          <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
-              onClick={active ? stop : listen}
-              aria-label={active ? "Stop listening" : "Listen live"}
-              className="inline-flex min-h-12 items-center gap-2 rounded-full bg-sky-600 px-6 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(14,165,233,.22)] transition hover:bg-sky-700"
+              onClick={toggleMute}
+              aria-label={muted ? "Unmute" : "Mute"}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-white/80 text-slate-600 ring-1 ring-white transition hover:text-slate-900"
             >
-              {busy ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              ) : state === "playing" ? (
-                <Pause className="h-4 w-4" aria-hidden />
-              ) : (
-                <Play className="h-4 w-4" aria-hidden />
-              )}
-              {state === "connecting" ? "Connecting…" : state === "reconnecting" ? "Reconnecting…" : state === "playing" ? "Stop" : "Listen live"}
+              {muted ? <VolumeX className="h-5 w-5" aria-hidden /> : <Volume2 className="h-5 w-5" aria-hidden />}
             </button>
-
-            <div className="ml-auto flex items-center gap-2">
-              <button type="button" onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"} className="text-slate-500 hover:text-slate-800">
-                {muted ? <VolumeX className="h-5 w-5" aria-hidden /> : <Volume2 className="h-5 w-5" aria-hidden />}
-              </button>
-              <label className="sr-only" htmlFor="podcast-volume">Volume</label>
-              <input
-                id="podcast-volume"
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={muted ? 0 : volume}
-                onChange={(event) => changeVolume(Number(event.target.value))}
-                className="w-24 accent-sky-600"
-              />
-            </div>
+            <label className="sr-only" htmlFor="podcast-volume">Volume</label>
+            <input
+              id="podcast-volume"
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={muted ? 0 : volume}
+              onChange={(event) => changeVolume(Number(event.target.value))}
+              className="hidden w-28 accent-sky-600 sm:block"
+            />
           </div>
-
-          {!status.online && state === "idle" && !message && (
-            <p className="mt-3 text-sm leading-6 text-slate-600">
-              The radio cannot be reached right now. It usually comes back within a few minutes.
-            </p>
-          )}
-
-          {message && (
-            <p
-              role={state === "error" ? "alert" : "status"}
-              className={`mt-3 rounded-xl border px-3 py-2 text-xs font-medium ${state === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-slate-200 bg-slate-50 text-slate-600"}`}
-            >
-              {message}
-            </p>
-          )}
-        </>
+        </div>
       )}
-    </div>
+
+      {message && (
+        <p
+          role={state === "error" ? "alert" : "status"}
+          className={`relative mt-4 rounded-xl border px-3 py-2 text-xs font-medium ${state === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-white bg-white/70 text-slate-600"}`}
+        >
+          {message}
+        </p>
+      )}
+    </section>
   );
 }
