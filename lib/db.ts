@@ -7,6 +7,12 @@ function databaseUrl(): string | undefined {
   if (!configured) return undefined;
   try {
     const url = new URL(configured);
+    // Supabase's pooler on port 6543 shares connections between clients, so
+    // Prisma must be told or its prepared statements collide and queries fail
+    // at random. The dashboard's copy of the string omits it.
+    if (url.port === "6543" && !url.searchParams.has("pgbouncer")) {
+      url.searchParams.set("pgbouncer", "true");
+    }
     // A small, bounded pool. Every page reads a handful of rows, and the pooler
     // is shared with the church site.
     if (!url.searchParams.has("connection_limit")) url.searchParams.set("connection_limit", "3");
