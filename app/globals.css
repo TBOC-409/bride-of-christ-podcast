@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+/*
+ * The church site's liquid glass look, carried across so the podcast feels like
+ * part of the same family. Only the pieces this site uses are included.
+ */
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+}
+
+body {
+  background-color: var(--color-slate-50);
+  color: var(--color-slate-900);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.site-public-page {
+  background:
+    radial-gradient(circle at 8% 28%, rgba(125, 211, 252, 0.2), transparent 24rem),
+    radial-gradient(circle at 92% 58%, rgba(196, 181, 253, 0.18), transparent 25rem),
+    linear-gradient(145deg, #f8fdff 0%, #eef9ff 52%, #f7f5ff 100%);
+}
+
+.site-liquid-home {
+  background:
+    radial-gradient(circle at 14% 16%, rgba(125, 211, 252, 0.5), transparent 27%),
+    radial-gradient(circle at 88% 8%, rgba(196, 181, 253, 0.42), transparent 25%),
+    radial-gradient(circle at 78% 82%, rgba(103, 232, 249, 0.35), transparent 28%),
+    linear-gradient(135deg, #f3fbff 0%, #e8f7ff 47%, #f6f3ff 100%);
+}
+
+.site-page-header-grid {
+  background-image:
+    radial-gradient(circle at 85% 15%, rgba(56, 189, 248, 0.22), transparent 26%),
+    linear-gradient(rgba(14, 116, 144, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(14, 116, 144, 0.045) 1px, transparent 1px);
+  background-size: auto, 48px 48px, 48px 48px;
+}
+
+.site-liquid-glass {
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.56);
+  box-shadow:
+    0 28px 75px rgba(14, 116, 144, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(24px) saturate(145%);
+  -webkit-backdrop-filter: blur(24px) saturate(145%);
+}
+
+.site-liquid-blob {
+  position: absolute;
+  border-radius: 42% 58% 65% 35% / 45% 42% 58% 55%;
+  filter: blur(2px);
+  opacity: 0.68;
+  pointer-events: none;
+  will-change: transform, border-radius;
+}
+
+.site-liquid-blob-one {
+  left: -9rem;
+  top: 9rem;
+  height: 25rem;
+  width: 25rem;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.38), rgba(103, 232, 249, 0.2));
+  animation: site-liquid-drift 12s ease-in-out infinite, site-liquid-morph 9s ease-in-out infinite;
+}
+
+.site-liquid-blob-two {
+  right: -8rem;
+  top: -6rem;
+  height: 29rem;
+  width: 29rem;
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.34), rgba(125, 211, 252, 0.24));
+  animation: site-liquid-drift 14s ease-in-out -4s infinite reverse, site-liquid-morph 11s ease-in-out -2s infinite;
+}
+
+@keyframes site-liquid-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: translate3d(24px, -18px, 0) rotate(8deg); }
+}
+
+@keyframes site-liquid-morph {
+  0%, 100% { border-radius: 42% 58% 65% 35% / 45% 42% 58% 55%; }
+  50% { border-radius: 61% 39% 37% 63% / 38% 58% 42% 62%; }
+}
+
+/* Motion is decoration here; switch it off for anyone who asks their device to. */
+@media (prefers-reduced-motion: reduce) {
+  .site-liquid-blob {
+    animation: none;
+  }
+}

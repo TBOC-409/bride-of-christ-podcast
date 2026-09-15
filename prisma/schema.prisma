@@ -1,0 +1,35 @@
+// READ ONLY. This app shares the church database and must never change it.
+//
+// Only the columns listeners need are described here. The session's LiveKit
+// room name and its recording link are left out on purpose, so this app cannot
+// select them even by accident, and the database login it uses is refused
+// access to them as well.
+//
+// Never run `prisma db push` or `prisma migrate` from this project. This file
+// describes one table; Prisma would read every other church table as unwanted
+// and try to delete it. Schema changes belong in the church project.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model PodcastSession {
+  id          String    @id
+  title       String
+  description String?
+  hostName    String
+  // Handed to a listener only by the stream route, and only while live.
+  streamUrl   String?
+  status      String // SCHEDULED | LIVE | ENDED
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  endedAt     DateTime?
+  published   Boolean
+  createdAt   DateTime
+  updatedAt   DateTime
+}
