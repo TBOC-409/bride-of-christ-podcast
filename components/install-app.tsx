@@ -119,7 +119,7 @@ export function InstallApp() {
       <button
         type="button"
         onClick={install}
-        className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-navy-900/15 bg-white/70 px-3.5 text-xs font-semibold text-navy-900 transition hover:border-gold-500"
+        className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-navy-900/15 bg-white px-3.5 text-xs font-semibold text-navy-900 transition hover:border-gold-500 hover:bg-sky-wash-50"
       >
         <Download className="h-3.5 w-3.5" aria-hidden />
         Install app

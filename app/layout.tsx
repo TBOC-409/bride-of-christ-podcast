@@ -23,13 +23,13 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, statusBarStyle: "default", title: "IHP Radio" },
 };
 
-export const viewport: Viewport = { themeColor: "#dde9fb", colorScheme: "light" };
+export const viewport: Viewport = { themeColor: "#ffffff", colorScheme: "light" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${fraunces.variable}`}>
       <body className="presence-light min-h-screen text-navy-950">
-        <header className="sticky top-0 z-50 border-b border-sky-wash-200 bg-sky-wash-100/80 backdrop-blur-xl">
+        <header className="sticky top-0 z-50 border-b border-sky-wash-200 bg-white shadow-[0_8px_24px_-16px_rgba(21,32,99,0.25)]">
           <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
             <Link href="/" className="flex min-w-0 items-center gap-3" aria-label={`${siteName} home`}>
               <Image
@@ -38,7 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 width={40}
                 height={40}
                 priority
-                className="h-9 w-9 shrink-0 rounded-full bg-white object-cover shadow-sm ring-1 ring-gold-400/60"
+                className="h-9 w-9 shrink-0 rounded-full bg-white object-cover shadow-sm ring-2 ring-gold-400/70"
               />
               <span className="min-w-0 leading-none">
                 <span className="block truncate font-serif text-[15px] font-semibold uppercase tracking-[0.12em] text-navy-950 sm:text-base">

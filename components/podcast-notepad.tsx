@@ -196,7 +196,7 @@ export function PodcastNotepad() {
           value={notes}
           onChange={(event) => update(event.target.value)}
           placeholder="Write down what speaks to you as you listen…"
-          className="journal-lines block min-h-64 w-full resize-y bg-transparent text-base text-navy-950 outline-none placeholder:italic placeholder:text-navy-950/35 sm:min-h-80"
+          className="journal-lines block min-h-[35rem] w-full resize-y bg-transparent text-base text-navy-950 outline-none placeholder:italic placeholder:text-navy-950/35 lg:min-h-[37.5rem]"
         />
 
         <div className="flex items-center justify-between gap-3 border-t border-sky-wash-200 bg-white/80 px-3 py-2 text-xs text-navy-950/50">

@@ -62,10 +62,17 @@ body {
 /* ---- The signal dial: the logo, still, inside a ring of signal bars. ---- */
 
 .signal-dial {
-  --dial: min(74vw, 19rem);
+  /* Compact on phones, so the radio card stays shorter than the journal. */
+  --dial: min(46vw, 11.5rem);
   position: relative;
   width: var(--dial);
   height: var(--dial);
+}
+
+@media (min-width: 40rem) {
+  .signal-dial {
+    --dial: 19rem;
+  }
 }
 
 .signal-bars > span {

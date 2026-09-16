@@ -347,7 +347,7 @@ export function PodcastPlayer({ initialStatus, children }: { initialStatus: Stre
 
       <div className="mx-auto grid max-w-6xl gap-6 px-4 pt-6 sm:px-6 sm:pt-10 lg:grid-cols-[1fr_1fr] lg:items-start lg:gap-8 lg:px-8">
         {/* On wide screens the player stays in view while notes are written. */}
-        <section className="relative isolate overflow-hidden rounded-[2rem] border border-sky-wash-200 bg-white/85 px-5 pb-7 pt-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_30px_80px_-30px_rgba(21,32,99,0.25)] sm:px-10 sm:pb-9 sm:pt-6 lg:sticky lg:top-24">
+        <section className="relative isolate overflow-hidden rounded-[2rem] border border-sky-wash-200 bg-white/85 px-5 pb-5 pt-7 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_30px_80px_-30px_rgba(21,32,99,0.25)] sm:px-10 sm:pb-9 sm:pt-6 lg:sticky lg:top-24">
           <div
             className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-3/4 bg-[radial-gradient(ellipse_at_50%_38%,rgba(226,180,87,0.16),transparent_65%)]"
             aria-hidden
@@ -370,7 +370,7 @@ export function PodcastPlayer({ initialStatus, children }: { initialStatus: Stre
           />
 
           <h1 className="sr-only">In His Presence, live radio from The Bride of Christ</h1>
-          <div className="flex min-h-7 items-center justify-end">
+          <div className="absolute right-4 top-4 sm:static sm:flex sm:min-h-7 sm:items-center sm:justify-end">
             {status.configured &&
               (status.online ? (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-red-700">
@@ -388,13 +388,13 @@ export function PodcastPlayer({ initialStatus, children }: { initialStatus: Stre
               ))}
           </div>
 
-          <div className="mt-5 flex justify-center sm:mt-6">
+          <div className="flex justify-center sm:mt-6">
             <SignalDial playing={playing} />
           </div>
 
-          <div className="mt-5 sm:mt-6" aria-live="polite">
+          <div className="mt-3 sm:mt-6" aria-live="polite">
             <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-gold-700">Now playing</p>
-            <p className="mx-auto mt-2 line-clamp-2 max-w-md font-serif text-2xl font-medium leading-tight tracking-tight text-navy-950 sm:text-[1.9rem]">
+            <p className="mx-auto mt-2 line-clamp-2 max-w-md font-serif text-xl font-medium leading-tight tracking-tight text-navy-950 sm:text-[1.9rem]">
               {song}
             </p>
             <p className="mx-auto mt-1.5 max-w-md truncate text-sm font-medium text-navy-950/60">
@@ -404,18 +404,18 @@ export function PodcastPlayer({ initialStatus, children }: { initialStatus: Stre
           </div>
 
           {status.configured && (
-            <div ref={controls} className="mt-6 flex flex-col items-center sm:mt-7">
+            <div ref={controls} className="mt-4 flex flex-col items-center sm:mt-7">
               <button
                 type="button"
                 onClick={active ? stop : listen}
                 aria-label={active ? "Stop listening" : "Listen live"}
-                className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-navy-900 text-white shadow-[0_0_0_8px_rgba(226,180,87,0.22),0_18px_40px_rgba(21,32,99,0.3)] transition hover:bg-navy-800 active:scale-95"
+                className="flex h-16 w-16 items-center justify-center rounded-full bg-navy-900 text-white shadow-[0_0_0_8px_rgba(226,180,87,0.22),0_18px_40px_rgba(21,32,99,0.3)] transition hover:bg-navy-800 active:scale-95 sm:h-[4.5rem] sm:w-[4.5rem]"
               >
-                {playIcon("h-7 w-7")}
+                {playIcon("h-6 w-6 sm:h-7 sm:w-7")}
               </button>
-              <p className="mt-4 text-xs font-medium text-navy-950/55">{stateLabel}</p>
+              <p className="mt-2.5 text-xs font-medium text-navy-950/55 sm:mt-4">{stateLabel}</p>
 
-              <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-sky-wash-200 bg-sky-wash-50 p-1 sm:pr-4">
+              <div className="mt-4 hidden items-center gap-2 rounded-full sm:inline-flex border border-sky-wash-200 bg-sky-wash-50 p-1 sm:pr-4">
                 <button
                   type="button"
                   onClick={toggleMute}
