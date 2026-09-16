@@ -105,6 +105,21 @@ const AUDIO_FILE = /\.(?:mp3|wma|m4a|aac|wav|flac|ogg|opus|amr)\s*$/i;
 /** Leading track numbers in a file name: "04 04 ", "01. ", "1-". */
 const TRACK_NUMBERS = /^(?:\d{1,3}(?:\s*[.)\-–_]\s*|\s+))+/;
 
+/** Short words kept lower case inside a title, as in "Rock of Ages". */
+const MINOR_WORDS = new Set(["a", "an", "and", "at", "by", "for", "in", "of", "on", "or", "the", "to", "with"]);
+
+/**
+ * Song files are often named all in lower case, such as "enough is enough nana
+ * bonsu". Those get ordinary title capitals. A title with any capital letters
+ * is left exactly as the broadcaster wrote it.
+ */
+export function capitaliseTitle(title: string): string {
+  if (title !== title.toLowerCase() || title === title.toUpperCase()) return title;
+  return title.replace(/\S+/g, (word, offset: number) =>
+    offset > 0 && MINOR_WORDS.has(word) ? word : word.charAt(0).toUpperCase() + word.slice(1),
+  );
+}
+
 /**
  * A title fit to show listeners.
  *
@@ -128,7 +143,7 @@ export function tidyTitle(text: string | null | undefined): string | null {
 
   tidy = tidy.replace(/\s+/g, " ").replace(/\s+-\s*$/, "").trim();
   if (PLACEHOLDER_TITLES.has(tidy.toLowerCase())) return null;
-  return tidy.slice(0, 200);
+  return capitaliseTitle(tidy).slice(0, 200);
 }
 
 export function cleanTitle(source: IcecastSource | null): string | null {

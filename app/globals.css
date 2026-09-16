@@ -1,114 +1,200 @@
 @import "tailwindcss";
 
 /*
- * The church site's liquid glass look, carried across so the podcast feels like
- * part of the same family. Only the pieces this site uses are included.
+ * In His Presence: a calm light blue, with the navy and gold of the church logo.
+ * The player and the journal share one card style so the page reads as a
+ * single whole.
  */
 
 @theme inline {
   --font-sans: var(--font-geist-sans);
+  --font-serif: var(--font-fraunces);
+
+  --color-sky-wash-50: #f7fbff;
+  --color-sky-wash-100: #dde9fb;
+  --color-sky-wash-200: #d6e5f8;
+  --color-sky-wash-300: #bfd5f2;
+  --color-navy-950: #0d1440;
+  --color-navy-900: #152063;
+  --color-navy-800: #1d2c86;
+  --color-navy-700: #2a3fb0;
+  --color-gold-300: #efd08a;
+  --color-gold-400: #e2b457;
+  --color-gold-500: #c99a3a;
+  --color-gold-600: #a87c26;
+  --color-gold-700: #8a6519;
 }
 
 body {
-  background-color: var(--color-slate-50);
-  color: var(--color-slate-900);
+  background-color: var(--color-sky-wash-100);
+  color: var(--color-navy-950);
   font-family: var(--font-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-.site-public-page {
+/* A clear light-blue sky: brighter at the top, with a faint warmth of gold below. */
+.presence-light {
   background:
-    radial-gradient(circle at 8% 28%, rgba(125, 211, 252, 0.2), transparent 24rem),
-    radial-gradient(circle at 92% 58%, rgba(196, 181, 253, 0.18), transparent 25rem),
-    linear-gradient(145deg, #f8fdff 0%, #eef9ff 52%, #f7f5ff 100%);
+    radial-gradient(ellipse 55rem 34rem at 50% -10%, rgba(255, 255, 255, 0.55), transparent 70%),
+    radial-gradient(ellipse 45rem 30rem at 100% 0%, rgba(120, 170, 240, 0.35), transparent 70%),
+    radial-gradient(ellipse 40rem 30rem at 0% 100%, rgba(226, 180, 87, 0.1), transparent 70%),
+    var(--color-sky-wash-100);
+  background-attachment: fixed;
 }
 
-.site-liquid-home {
-  background:
-    radial-gradient(circle at 14% 16%, rgba(125, 211, 252, 0.5), transparent 27%),
-    radial-gradient(circle at 88% 8%, rgba(196, 181, 253, 0.42), transparent 25%),
-    radial-gradient(circle at 78% 82%, rgba(103, 232, 249, 0.35), transparent 28%),
-    linear-gradient(135deg, #f3fbff 0%, #e8f7ff 47%, #f6f3ff 100%);
+/* ---- The on-air band: scrolls like a station ticker. ---- */
+
+.on-air-ticker {
+  mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
 }
 
-
-.site-liquid-glass {
-  border: 1px solid rgba(255, 255, 255, 0.82);
-  background: rgba(255, 255, 255, 0.56);
-  box-shadow:
-    0 28px 75px rgba(14, 116, 144, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(24px) saturate(145%);
-  -webkit-backdrop-filter: blur(24px) saturate(145%);
+.on-air-track {
+  display: flex;
+  width: max-content;
+  animation: on-air-scroll 45s linear infinite;
 }
 
-.site-liquid-blob {
+@keyframes on-air-scroll {
+  to { transform: translateX(-50%); }
+}
+
+/* ---- The signal dial: the logo, still, inside a ring of signal bars. ---- */
+
+.signal-dial {
+  --dial: min(74vw, 19rem);
+  position: relative;
+  width: var(--dial);
+  height: var(--dial);
+}
+
+.signal-bars > span {
   position: absolute;
-  border-radius: 42% 58% 65% 35% / 45% 42% 58% 55%;
-  filter: blur(2px);
-  opacity: 0.68;
-  pointer-events: none;
-  will-change: transform, border-radius;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
 }
 
-.site-liquid-blob-one {
-  left: -9rem;
-  top: 9rem;
-  height: 25rem;
-  width: 25rem;
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.38), rgba(103, 232, 249, 0.2));
-  animation: site-liquid-drift 12s ease-in-out infinite, site-liquid-morph 9s ease-in-out infinite;
+/* Each bar stands on a circle just outside the logo and grows outward. */
+.signal-bars > span > i {
+  position: absolute;
+  left: -1.5px;
+  bottom: calc(var(--dial) * 0.355);
+  width: 3px;
+  height: calc(var(--dial) * 0.13);
+  border-radius: 999px;
+  background: linear-gradient(to top, var(--color-gold-500), rgba(201, 154, 58, 0.08));
+  transform-origin: bottom;
+  transform: scaleY(0.16);
+  opacity: 0.5;
+  transition: opacity 0.4s ease;
 }
 
-.site-liquid-blob-two {
-  right: -8rem;
-  top: -6rem;
-  height: 29rem;
-  width: 29rem;
-  background: linear-gradient(135deg, rgba(167, 139, 250, 0.34), rgba(125, 211, 252, 0.24));
-  animation: site-liquid-drift 14s ease-in-out -4s infinite reverse, site-liquid-morph 11s ease-in-out -2s infinite;
+.signal-dial[data-playing="true"] .signal-bars > span > i {
+  opacity: 1;
+  animation-name: signal-bar;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
 }
 
-@keyframes site-liquid-drift {
-  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
-  50% { transform: translate3d(24px, -18px, 0) rotate(8deg); }
+@keyframes signal-bar {
+  from { transform: scaleY(0.14); }
+  to { transform: scaleY(1); }
 }
 
-@keyframes site-liquid-morph {
-  0%, 100% { border-radius: 42% 58% 65% 35% / 45% 42% 58% 55%; }
-  50% { border-radius: 61% 39% 37% 63% / 38% 58% 42% 62%; }
+/* A warm glow behind the logo that gently brightens while audio plays. */
+.signal-halo {
+  position: absolute;
+  inset: 10%;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(226, 180, 87, 0.45), rgba(226, 180, 87, 0) 70%);
+  opacity: 0.5;
+  transition: opacity 0.6s ease;
+}
+
+.signal-dial[data-playing="true"] .signal-halo {
+  animation: signal-breathe 4s ease-in-out infinite;
+}
+
+@keyframes signal-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(0.97); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+.signal-ring {
+  position: absolute;
+  inset: 13%;
+  border-radius: 999px;
+  border: 1px solid rgba(201, 154, 58, 0.5);
+}
+
+.signal-disc {
+  position: absolute;
+  inset: 17%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 18px 40px rgba(21, 32, 99, 0.18);
+}
+
+/* ---- The journal: ruled lines with a gold margin, scrolling with the writing. ---- */
+
+.journal-lines {
+  --line: 1.75rem;
+  line-height: var(--line);
+  padding: 0.5rem 1rem 0.5rem 3.25rem;
+  background-image:
+    linear-gradient(90deg, transparent 2.4rem, rgba(201, 154, 58, 0.5) 2.4rem, rgba(201, 154, 58, 0.5) calc(2.4rem + 1px), transparent calc(2.4rem + 1px)),
+    linear-gradient(transparent calc(var(--line) - 1px), rgba(21, 32, 99, 0.09) calc(var(--line) - 1px));
+  background-size: 100% 100%, 100% var(--line);
+  background-position: 0 0, 0 0.5rem;
+  background-attachment: local;
+}
+
+/* A slim volume bar. --fill is how far along it is, set from the volume. */
+.volume-range {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--color-navy-900) var(--fill), var(--color-sky-wash-300) var(--fill));
+  cursor: pointer;
+}
+
+.volume-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #fff;
+  border: 2px solid var(--color-navy-900);
+  box-shadow: 0 1px 4px rgba(21, 32, 99, 0.3);
+}
+
+.volume-range::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #fff;
+  border: 2px solid var(--color-navy-900);
+  box-shadow: 0 1px 4px rgba(21, 32, 99, 0.3);
+}
+
+.volume-range:focus-visible {
+  outline: 2px solid var(--color-gold-500);
+  outline-offset: 4px;
 }
 
 /* Motion is decoration here; switch it off for anyone who asks their device to. */
 @media (prefers-reduced-motion: reduce) {
-  .site-liquid-blob {
+  .on-air-track,
+  .signal-dial[data-playing="true"] .signal-halo {
     animation: none;
   }
-}
-
-/* Equalizer bars on the player: moving while audio plays, resting otherwise. */
-.site-eq > span {
-  transform-origin: bottom;
-  animation: site-eq 0.9s ease-in-out infinite;
-}
-.site-eq > span:nth-child(2) { animation-delay: -0.35s; }
-.site-eq > span:nth-child(3) { animation-delay: -0.6s; }
-.site-eq > span:nth-child(4) { animation-delay: -0.15s; }
-.site-eq[data-active="false"] > span {
-  animation: none;
-  transform: scaleY(0.3);
-  opacity: 0.55;
-}
-
-@keyframes site-eq {
-  0%, 100% { transform: scaleY(0.3); }
-  50% { transform: scaleY(1); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .site-eq > span {
+  .signal-dial[data-playing="true"] .signal-bars > span > i {
     animation: none;
-    transform: scaleY(0.6);
+    transform: scaleY(0.55);
   }
 }

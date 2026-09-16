@@ -14,10 +14,10 @@ export default function OfflinePage() {
         alt=""
         width={80}
         height={80}
-        className="mx-auto h-20 w-20 rounded-2xl object-cover shadow-lg ring-4 ring-white"
+        className="mx-auto h-20 w-20 rounded-full bg-white object-cover shadow-[0_0_60px_rgba(226,180,87,.45)] ring-1 ring-gold-400/60"
       />
-      <h1 className="mt-6 text-2xl font-bold text-slate-900">You are offline</h1>
-      <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-slate-600">
+      <h1 className="mt-6 font-serif text-3xl font-medium tracking-tight text-navy-950">You are offline</h1>
+      <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-navy-950/60">
         The radio needs an internet connection. Your notes are still saved on this device, and the radio will
         play again as soon as you are back online.
       </p>

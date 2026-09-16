@@ -1,4 +1,6 @@
-# The Bride of Christ Podcast
+# In His Presence
+
+The Bride of Christ's radio station.
 
 The public listening site for the church's radio. The stream runs around the
 clock: church programmes go out live most days of the week, with gospel music in

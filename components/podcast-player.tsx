@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { Loader2, Pause, Play, Volume2, VolumeX } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Loader2, Play, Square, Volume2, VolumeX } from "lucide-react";
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
 import type { StreamStatus } from "@/lib/icecast";
 import { HEARTBEAT_MS } from "@/lib/listeners";
 
@@ -11,6 +11,8 @@ const POLL_MS = 20_000;
 /** Reconnection attempts when the stream drops. */
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 3_000;
+/** Height of the sticky site header, which covers the top of the page. */
+const HEADER_PX = 64;
 /** Browser storage key for the anonymous listener ID. */
 const LISTENER_KEY = "boc-podcast-listener";
 
@@ -32,19 +34,81 @@ function listenerId(): string {
 
 type PlayState = "idle" | "connecting" | "playing" | "reconnecting" | "error";
 
-/** Four bars that move while audio plays and rest when it does not. */
-function Equalizer({ active }: { active: boolean }) {
+const BAR_COUNT = 72;
+/**
+ * The ring of signal bars. Timings vary from bar to bar so the ring ripples
+ * rather than pulsing as one, but are fixed, so server and browser agree.
+ */
+const BARS = Array.from({ length: BAR_COUNT }, (_, index) => ({
+  angle: (360 / BAR_COUNT) * index,
+  delay: -((index * 37) % 97) / 100,
+  duration: 0.55 + ((index * 53) % 60) / 100,
+}));
+
+/**
+ * The logo, held still, inside a ring of signal bars. While audio plays the
+ * bars rise and a warm glow behind the logo gently brightens; both settle when
+ * it stops. The bars are decoration, not a reading of the audio: measuring a
+ * stream from another site would silence it in the browser.
+ */
+function SignalDial({ playing }: { playing: boolean }) {
   return (
-    <span className="site-eq flex h-5 items-end gap-[3px]" data-active={active} aria-hidden>
-      {[0, 1, 2, 3].map((bar) => (
-        <span key={bar} className="h-full w-[3px] rounded-full bg-sky-500" />
+    <div className="signal-dial" data-playing={playing} aria-hidden>
+      <div className="signal-bars absolute inset-0">
+        {BARS.map((bar) => (
+          <span key={bar.angle} style={{ transform: `rotate(${bar.angle}deg)` }}>
+            <i style={{ animationDelay: `${bar.delay}s`, animationDuration: `${bar.duration}s` }} />
+          </span>
+        ))}
+      </div>
+      <div className="signal-halo" />
+      <div className="signal-ring" />
+      <div className="signal-disc">
+        <Image src="/logo.png" alt="" fill priority sizes="200px" className="scale-[1.16] object-cover" />
+      </div>
+    </div>
+  );
+}
+
+/** A scrolling station band under the header, repeated so it loops seamlessly. */
+function OnAirTicker({ items }: { items: string[] }) {
+  const run = [...items, ...items, ...items];
+  const group = (hidden: boolean) => (
+    <ul className="flex shrink-0 items-center" aria-hidden={hidden || undefined}>
+      {run.map((item, index) => (
+        <li key={index} className="flex items-center whitespace-nowrap">
+          <span className="px-5">{item}</span>
+          <span className="text-gold-500" aria-hidden>✦</span>
+        </li>
       ))}
-    </span>
+    </ul>
+  );
+  return (
+    <div className="border-b border-sky-wash-200 bg-white/50" aria-hidden>
+      <div className="on-air-ticker overflow-hidden py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-navy-900/70">
+        <div className="on-air-track">
+          {group(false)}
+          {group(true)}
+        </div>
+      </div>
+    </div>
   );
 }
 
 /**
+ * Streams announce songs as "Artist - Song". Split that way, the song can lead
+ * and the artist sit beneath it. Anything else, such as a programme name, is
+ * shown whole.
+ */
+function splitTitle(title: string): { song: string; artist: string | null } {
+  const parts = title.split(" - ");
+  if (parts.length !== 2 || !parts[0].trim() || !parts[1].trim()) return { song: title, artist: null };
+  return { song: parts[1].trim(), artist: parts[0].trim() };
+}
+
+/**
  * The player for the church's 24/7 radio, and the centrepiece of the page.
+ * Whatever is passed as children (the notepad) sits beside it.
  *
  * The stream never stops: church programmes go out live, with music between
  * them. So there is no on air or off air, only what is playing now, which the
@@ -54,7 +118,7 @@ function Equalizer({ active }: { active: boolean }) {
  * download, and the address is fetched when someone presses Listen rather than
  * written into the page. Neither stops a determined listener recording it.
  */
-export function PodcastPlayer({ initialStatus }: { initialStatus: StreamStatus }) {
+export function PodcastPlayer({ initialStatus, children }: { initialStatus: StreamStatus; children?: ReactNode }) {
   const audio = useRef<HTMLAudioElement | null>(null);
   /** True from pressing Listen until pressing Stop, so drops can be retried. */
   const wantPlaying = useRef(false);
@@ -65,6 +129,23 @@ export function PodcastPlayer({ initialStatus }: { initialStatus: StreamStatus }
   const [message, setMessage] = useState("");
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(0.9);
+  const controls = useRef<HTMLDivElement | null>(null);
+  /** True once the main controls have scrolled up out of view, to show the mini player. */
+  const [controlsPassed, setControlsPassed] = useState(false);
+
+  // On phones the notepad sits below the player, so a mini player docks at the
+  // bottom while writing. On wide screens the player stays in view and it never shows.
+  useEffect(() => {
+    const element = controls.current;
+    if (!element || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      // Only once scrolled past, not while still further down a short screen.
+      ([entry]) => setControlsPassed(!entry.isIntersecting && entry.boundingClientRect.top < HEADER_PX),
+      { rootMargin: `-${HEADER_PX}px 0px 0px 0px` },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   // Starts from the server's answer, then keeps "now playing" current,
   // checking again straight away when someone returns to the tab.
@@ -223,126 +304,180 @@ export function PodcastPlayer({ initialStatus }: { initialStatus: StreamStatus }
 
   const busy = state === "connecting" || state === "reconnecting";
   const active = busy || state === "playing";
+  const playing = state === "playing";
   const nowPlaying = !status.configured
     ? "The radio has not been set up yet."
     : status.online
       ? status.title ?? "Live now"
       : "The radio cannot be reached right now.";
+  const { song, artist } = status.online && status.title ? splitTitle(status.title) : { song: nowPlaying, artist: null };
+  const listenersLine =
+    status.online && status.listeners !== null
+      ? `${status.listeners} ${status.listeners === 1 ? "person" : "people"} listening`
+      : null;
+  const stateLabel =
+    state === "connecting"
+      ? "Connecting…"
+      : state === "reconnecting"
+        ? "Reconnecting…"
+        : playing
+          ? "You are listening live"
+          : "Tap to listen live";
+  const tickerItems = [
+    status.online ? `On air · ${nowPlaying}` : "In His Presence",
+    "Live around the clock",
+    "Church programmes most days",
+    "Gospel music in between",
+    ...(listenersLine ? [listenersLine] : []),
+  ];
+  const volumeFill = { "--fill": `${Math.round((muted ? 0 : volume) * 100)}%` } as CSSProperties;
+
+  const playIcon = (size: string) =>
+    busy ? (
+      <Loader2 className={`${size} animate-spin`} aria-hidden />
+    ) : playing ? (
+      <Square className={`${size} fill-current`} aria-hidden />
+    ) : (
+      <Play className={`${size} ml-0.5 fill-current`} aria-hidden />
+    );
 
   return (
-    <section className="site-liquid-home relative isolate overflow-hidden rounded-3xl border border-white/80 p-5 shadow-[0_30px_80px_rgba(14,116,144,0.16)] sm:p-8">
-      <div className="site-liquid-blob site-liquid-blob-one pointer-events-none opacity-50" aria-hidden />
-      <div className="site-liquid-blob site-liquid-blob-two pointer-events-none opacity-40" aria-hidden />
+    <>
+      <OnAirTicker items={tickerItems} />
 
-      <audio
-        ref={audio}
-        preload="none"
-        controlsList="nodownload noplaybackrate"
-        onContextMenu={(event) => event.preventDefault()}
-        onPlaying={() => {
-          retries.current = 0;
-          setState("playing");
-          setMessage("");
-        }}
-        onWaiting={() => {
-          if (wantPlaying.current) setMessage("Buffering…");
-        }}
-        onError={() => retryOrGiveUp("The stream dropped.")}
-        onEnded={() => retryOrGiveUp("The stream ended.")}
-      />
+      <div className="mx-auto grid max-w-6xl gap-6 px-4 pt-6 sm:px-6 sm:pt-10 lg:grid-cols-[1fr_1fr] lg:items-start lg:gap-8 lg:px-8">
+        {/* On wide screens the player stays in view while notes are written. */}
+        <section className="relative isolate overflow-hidden rounded-[2rem] border border-sky-wash-200 bg-white/85 px-5 pb-7 pt-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_30px_80px_-30px_rgba(21,32,99,0.25)] sm:px-10 sm:pb-9 sm:pt-6 lg:sticky lg:top-24">
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-3/4 bg-[radial-gradient(ellipse_at_50%_38%,rgba(226,180,87,0.16),transparent_65%)]"
+            aria-hidden
+          />
+          <audio
+            ref={audio}
+            preload="none"
+            controlsList="nodownload noplaybackrate"
+            onContextMenu={(event) => event.preventDefault()}
+            onPlaying={() => {
+              retries.current = 0;
+              setState("playing");
+              setMessage("");
+            }}
+            onWaiting={() => {
+              if (wantPlaying.current) setMessage("Buffering…");
+            }}
+            onError={() => retryOrGiveUp("The stream dropped.")}
+            onEnded={() => retryOrGiveUp("The stream ended.")}
+          />
 
-      <div className="relative flex items-center gap-4">
-        <Image
-          src="/logo.png"
-          alt=""
-          width={72}
-          height={72}
-          priority
-          className="h-16 w-16 shrink-0 rounded-2xl object-cover shadow-lg ring-4 ring-white sm:h-[72px] sm:w-[72px]"
-        />
-        <div className="min-w-0">
-          {status.configured &&
-            (status.online ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white shadow-sm">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" aria-hidden />
-                Live radio
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-200 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-600">
-                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" aria-hidden />
-                Unavailable
-              </span>
-            ))}
-          <h1 className="mt-1.5 text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">The Bride Online Radio</h1>
-          <p className="mt-0.5 text-sm leading-5 text-slate-600">Church programmes most days, gospel music in between.</p>
-        </div>
-      </div>
-
-      <div className="relative mt-6 rounded-2xl bg-white/75 p-4 ring-1 ring-white sm:p-5" aria-live="polite">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Now playing</p>
-          {status.online && <Equalizer active={state === "playing"} />}
-        </div>
-        <p className="mt-1.5 line-clamp-2 text-lg font-semibold leading-snug text-slate-900 sm:text-xl">{nowPlaying}</p>
-        {status.online && status.listeners !== null && (
-          <p className="mt-1 text-xs font-medium text-slate-500">
-            {status.listeners} {status.listeners === 1 ? "person" : "people"} listening
-          </p>
-        )}
-      </div>
-
-      {status.configured && (
-        <div className="relative mt-6 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={active ? stop : listen}
-            aria-label={active ? "Stop listening" : "Listen live"}
-            className="inline-flex min-h-14 items-center gap-2.5 rounded-full bg-sky-600 py-2 pl-2 pr-6 text-base font-semibold text-white shadow-[0_12px_32px_rgba(2,132,199,.35)] transition hover:bg-sky-700 active:scale-[0.98]"
-          >
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
-              {busy ? (
-                <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-              ) : state === "playing" ? (
-                <Pause className="h-5 w-5" aria-hidden />
+          <h1 className="sr-only">In His Presence, live radio from The Bride of Christ</h1>
+          <div className="flex min-h-7 items-center justify-end">
+            {status.configured &&
+              (status.online ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-red-700">
+                  <span className="relative flex h-1.5 w-1.5" aria-hidden>
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75 motion-reduce:animate-none" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500" />
+                  </span>
+                  On air
+                </span>
               ) : (
-                <Play className="ml-0.5 h-5 w-5" aria-hidden />
-              )}
-            </span>
-            {state === "connecting" ? "Connecting…" : state === "reconnecting" ? "Reconnecting…" : state === "playing" ? "Stop" : "Listen live"}
-          </button>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-wash-300 bg-sky-wash-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-navy-950/50">
+                  <span className="h-1.5 w-1.5 rounded-full bg-navy-950/30" aria-hidden />
+                  Off air
+                </span>
+              ))}
+          </div>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="mt-5 flex justify-center sm:mt-6">
+            <SignalDial playing={playing} />
+          </div>
+
+          <div className="mt-5 sm:mt-6" aria-live="polite">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-gold-700">Now playing</p>
+            <p className="mx-auto mt-2 line-clamp-2 max-w-md font-serif text-2xl font-medium leading-tight tracking-tight text-navy-950 sm:text-[1.9rem]">
+              {song}
+            </p>
+            <p className="mx-auto mt-1.5 max-w-md truncate text-sm font-medium text-navy-950/60">
+              {artist ?? "Live from The Bride of Christ"}
+            </p>
+            {listenersLine && <p className="mt-1 text-xs text-navy-950/45">{listenersLine}</p>}
+          </div>
+
+          {status.configured && (
+            <div ref={controls} className="mt-6 flex flex-col items-center sm:mt-7">
+              <button
+                type="button"
+                onClick={active ? stop : listen}
+                aria-label={active ? "Stop listening" : "Listen live"}
+                className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-navy-900 text-white shadow-[0_0_0_8px_rgba(226,180,87,0.22),0_18px_40px_rgba(21,32,99,0.3)] transition hover:bg-navy-800 active:scale-95"
+              >
+                {playIcon("h-7 w-7")}
+              </button>
+              <p className="mt-4 text-xs font-medium text-navy-950/55">{stateLabel}</p>
+
+              <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-sky-wash-200 bg-sky-wash-50 p-1 sm:pr-4">
+                <button
+                  type="button"
+                  onClick={toggleMute}
+                  aria-label={muted ? "Unmute" : "Mute"}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-navy-950/60 transition hover:bg-white hover:text-navy-950"
+                >
+                  {muted ? <VolumeX className="h-4 w-4" aria-hidden /> : <Volume2 className="h-4 w-4" aria-hidden />}
+                </button>
+                <label className="sr-only" htmlFor="podcast-volume">Volume</label>
+                <input
+                  id="podcast-volume"
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={muted ? 0 : volume}
+                  onChange={(event) => changeVolume(Number(event.target.value))}
+                  style={volumeFill}
+                  className="volume-range hidden w-32 sm:block"
+                />
+              </div>
+            </div>
+          )}
+
+          {message && (
+            <p
+              role={state === "error" ? "alert" : "status"}
+              className={`mx-auto mt-4 max-w-sm rounded-xl border px-3 py-2 text-xs font-medium ${state === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-sky-wash-200 bg-sky-wash-50 text-navy-950/70"}`}
+            >
+              {message}
+            </p>
+          )}
+        </section>
+
+        {children}
+      </div>
+
+      {/* The mini player, once the main controls have scrolled away. */}
+      {status.configured && controlsPassed && (
+        <div className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] lg:hidden">
+          <div className="mx-auto flex max-w-xl items-center gap-3 rounded-2xl border border-sky-wash-200 bg-white/90 p-2 pr-2.5 shadow-[0_20px_50px_-10px_rgba(21,32,99,0.3)] backdrop-blur-xl">
+            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-white ring-1 ring-gold-400/60" aria-hidden>
+              <Image src="/logo.png" alt="" fill sizes="44px" className="scale-[1.16] object-cover" />
+            </div>
+            <div className="min-w-0 flex-1 text-left">
+              <p className="truncate text-sm font-semibold text-navy-950">{song}</p>
+              <p className="truncate text-xs text-navy-950/55">
+                {playing ? "Listening live" : busy ? stateLabel : artist ?? "In His Presence"}
+                {playing && artist ? ` · ${artist}` : ""}
+              </p>
+            </div>
             <button
               type="button"
-              onClick={toggleMute}
-              aria-label={muted ? "Unmute" : "Mute"}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-white/80 text-slate-600 ring-1 ring-white transition hover:text-slate-900"
+              onClick={active ? stop : listen}
+              aria-label={active ? "Stop listening" : "Listen live"}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-navy-900 text-white transition hover:bg-navy-800 active:scale-95"
             >
-              {muted ? <VolumeX className="h-5 w-5" aria-hidden /> : <Volume2 className="h-5 w-5" aria-hidden />}
+              {playIcon("h-4 w-4")}
             </button>
-            <label className="sr-only" htmlFor="podcast-volume">Volume</label>
-            <input
-              id="podcast-volume"
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={muted ? 0 : volume}
-              onChange={(event) => changeVolume(Number(event.target.value))}
-              className="hidden w-28 accent-sky-600 sm:block"
-            />
           </div>
         </div>
       )}
-
-      {message && (
-        <p
-          role={state === "error" ? "alert" : "status"}
-          className={`relative mt-4 rounded-xl border px-3 py-2 text-xs font-medium ${state === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-white bg-white/70 text-slate-600"}`}
-        >
-          {message}
-        </p>
-      )}
-    </section>
+    </>
   );
 }

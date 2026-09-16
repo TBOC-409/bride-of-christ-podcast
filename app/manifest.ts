@@ -7,15 +7,15 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "The Bride of Christ Podcast",
-    short_name: "Bride Radio",
-    description: "Live church radio from The Bride of Christ, with a private notepad.",
+    name: "In His Presence",
+    short_name: "IHP Radio",
+    description: "In His Presence, live church radio from The Bride of Christ, with a private notepad.",
     start_url: "/?source=app",
     scope: "/",
     display: "standalone",
     orientation: "portrait",
-    background_color: "#f0f9ff",
-    theme_color: "#0ea5e9",
+    background_color: "#dde9fb",
+    theme_color: "#dde9fb",
     categories: ["music", "lifestyle"],
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

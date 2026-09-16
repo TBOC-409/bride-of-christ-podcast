@@ -1,3 +1,3 @@
-/** The church site's primary button, so both sites feel like one family. */
+/** The radio's primary button: logo navy with a gold glow. */
 export const primaryButton =
-  "inline-flex min-h-11 items-center justify-center rounded-full bg-gradient-to-r from-sky-500 to-cyan-500 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(14,165,233,.22)] transition hover:-translate-y-0.5 hover:from-sky-600 hover:to-cyan-600";
+  "inline-flex min-h-11 items-center justify-center rounded-full bg-navy-900 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_0_6px_rgba(226,180,87,.2),0_12px_30px_rgba(21,32,99,.25)] transition hover:bg-navy-800";

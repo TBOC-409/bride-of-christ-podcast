@@ -45,3 +45,14 @@ export function dayLabel(key: string, today: string = dayKey()): string {
     timeZone: "UTC",
   });
 }
+
+/** The full date for a page heading, such as "Wednesday 16 September". */
+export function longDayLabel(key: string): string {
+  if (!isDayKey(key)) return key;
+  return new Date(noonUtc(key)).toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+  });
+}
