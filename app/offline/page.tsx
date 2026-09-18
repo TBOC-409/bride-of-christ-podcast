@@ -14,7 +14,7 @@ export default function OfflinePage() {
         alt=""
         width={80}
         height={80}
-        className="mx-auto h-20 w-20 rounded-full bg-white object-cover shadow-[0_0_60px_rgba(226,180,87,.45)] ring-1 ring-gold-400/60"
+        className="mx-auto h-20 w-20 rounded-2xl bg-white object-cover shadow-[0_18px_40px_-18px_rgba(13,20,64,0.45)] ring-1 ring-navy-950/10"
       />
       <h1 className="mt-6 font-serif text-3xl font-medium tracking-tight text-navy-950">You are offline</h1>
       <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-navy-950/60">

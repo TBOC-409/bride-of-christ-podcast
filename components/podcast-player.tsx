@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { Loader2, Play, Square, Volume2, VolumeX } from "lucide-react";
-import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 import type { StreamStatus } from "@/lib/icecast";
 import { HEARTBEAT_MS } from "@/lib/listeners";
 
@@ -34,59 +34,35 @@ function listenerId(): string {
 
 type PlayState = "idle" | "connecting" | "playing" | "reconnecting" | "error";
 
-const BAR_COUNT = 72;
-/**
- * The ring of signal bars. Timings vary from bar to bar so the ring ripples
- * rather than pulsing as one, but are fixed, so server and browser agree.
- */
-const BARS = Array.from({ length: BAR_COUNT }, (_, index) => ({
-  angle: (360 / BAR_COUNT) * index,
-  delay: -((index * 37) % 97) / 100,
-  duration: 0.55 + ((index * 53) % 60) / 100,
-}));
-
-/**
- * The logo, held still, inside a ring of signal bars. While audio plays the
- * bars rise and a warm glow behind the logo gently brightens; both settle when
- * it stops. The bars are decoration, not a reading of the audio: measuring a
- * stream from another site would silence it in the browser.
- */
-function SignalDial({ playing }: { playing: boolean }) {
+/** Four bars beside the on-air badge, moving only while audio plays. */
+function Equalizer() {
   return (
-    <div className="signal-dial" data-playing={playing} aria-hidden>
-      <div className="signal-bars absolute inset-0">
-        {BARS.map((bar) => (
-          <span key={bar.angle} style={{ transform: `rotate(${bar.angle}deg)` }}>
-            <i style={{ animationDelay: `${bar.delay}s`, animationDuration: `${bar.duration}s` }} />
-          </span>
-        ))}
-      </div>
-      <div className="signal-halo" />
-      <div className="signal-ring" />
-      <div className="signal-disc">
-        <Image src="/logo.png" alt="" fill priority sizes="200px" className="scale-[1.16] object-cover" />
-      </div>
-    </div>
+    <span className="eq" aria-hidden>
+      <span />
+      <span />
+      <span />
+      <span />
+    </span>
   );
 }
 
-/** A scrolling station band under the header, repeated so it loops seamlessly. */
-function OnAirTicker({ items }: { items: string[] }) {
+/** A station strip under the header, repeated so the loop reads continuously. */
+function StationStrip({ items }: { items: string[] }) {
   const run = [...items, ...items, ...items];
   const group = (hidden: boolean) => (
     <ul className="flex shrink-0 items-center" aria-hidden={hidden || undefined}>
       {run.map((item, index) => (
         <li key={index} className="flex items-center whitespace-nowrap">
-          <span className="px-5">{item}</span>
-          <span className="text-gold-500" aria-hidden>✦</span>
+          <span className="px-6">{item}</span>
+          <span className="text-gold-600" aria-hidden>✦</span>
         </li>
       ))}
     </ul>
   );
   return (
-    <div className="border-b border-sky-wash-200 bg-white/50" aria-hidden>
-      <div className="on-air-ticker overflow-hidden py-2.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-navy-900/70">
-        <div className="on-air-track">
+    <div className="border-b border-navy-950/[0.07] bg-white" aria-hidden>
+      <div className="notice-ticker overflow-hidden py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-navy-900/65">
+        <div className="notice-track">
           {group(false)}
           {group(true)}
         </div>
@@ -107,8 +83,8 @@ function splitTitle(title: string): { song: string; artist: string | null } {
 }
 
 /**
- * The player for the church's 24/7 radio, and the centrepiece of the page.
- * Whatever is passed as children (the notepad) sits beside it.
+ * The player for the church's 24/7 radio: a broadcast band across the top of
+ * the page, with the journal below it.
  *
  * The stream never stops: church programmes go out live, with music between
  * them. So there is no on air or off air, only what is playing now, which the
@@ -118,7 +94,7 @@ function splitTitle(title: string): { song: string; artist: string | null } {
  * download, and the address is fetched when someone presses Listen rather than
  * written into the page. Neither stops a determined listener recording it.
  */
-export function PodcastPlayer({ initialStatus, children }: { initialStatus: StreamStatus; children?: ReactNode }) {
+export function PodcastPlayer({ initialStatus, stripLines }: { initialStatus: StreamStatus; stripLines: string[] }) {
   const audio = useRef<HTMLAudioElement | null>(null);
   /** True from pressing Listen until pressing Stop, so drops can be retried. */
   const wantPlaying = useRef(false);
@@ -311,25 +287,8 @@ export function PodcastPlayer({ initialStatus, children }: { initialStatus: Stre
       ? status.title ?? "Live now"
       : "The radio cannot be reached right now.";
   const { song, artist } = status.online && status.title ? splitTitle(status.title) : { song: nowPlaying, artist: null };
-  const listenersLine =
-    status.online && status.listeners !== null
-      ? `${status.listeners} ${status.listeners === 1 ? "person" : "people"} listening`
-      : null;
   const stateLabel =
-    state === "connecting"
-      ? "Connecting…"
-      : state === "reconnecting"
-        ? "Reconnecting…"
-        : playing
-          ? "You are listening live"
-          : "Tap to listen live";
-  const tickerItems = [
-    status.online ? `On air · ${nowPlaying}` : "In His Presence",
-    "Live around the clock",
-    "Church programmes most days",
-    "Gospel music in between",
-    ...(listenersLine ? [listenersLine] : []),
-  ];
+    state === "connecting" ? "Connecting…" : state === "reconnecting" ? "Reconnecting…" : playing ? "You are listening live" : "";
   const volumeFill = { "--fill": `${Math.round((muted ? 0 : volume) * 100)}%` } as CSSProperties;
 
   const playIcon = (size: string) =>
@@ -338,132 +297,138 @@ export function PodcastPlayer({ initialStatus, children }: { initialStatus: Stre
     ) : playing ? (
       <Square className={`${size} fill-current`} aria-hidden />
     ) : (
-      <Play className={`${size} ml-0.5 fill-current`} aria-hidden />
+      <Play className={`${size} fill-current`} aria-hidden />
     );
+
+  // What is playing leads; the rest is the church's own wording, set in the portal.
+  const stripItems = [status.online ? `On air · ${nowPlaying}` : "In His Presence", ...stripLines];
 
   return (
     <>
-      <OnAirTicker items={tickerItems} />
+      <StationStrip items={stripItems} />
 
-      <div className="mx-auto grid max-w-6xl gap-6 px-4 pt-6 sm:px-6 sm:pt-10 lg:grid-cols-[1fr_1fr] lg:items-start lg:gap-8 lg:px-8">
-        {/* On wide screens the player stays in view while notes are written. */}
-        <section className="relative isolate overflow-hidden rounded-[2rem] border border-sky-wash-200 bg-white/85 px-5 pb-5 pt-7 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_30px_80px_-30px_rgba(21,32,99,0.25)] sm:px-10 sm:pb-9 sm:pt-6 lg:sticky lg:top-24">
+      <section className="mx-auto max-w-6xl px-4 pt-7 sm:px-6 sm:pt-10 lg:px-8">
+        <audio
+          ref={audio}
+          preload="none"
+          controlsList="nodownload noplaybackrate"
+          onContextMenu={(event) => event.preventDefault()}
+          onPlaying={() => {
+            retries.current = 0;
+            setState("playing");
+            setMessage("");
+          }}
+          onWaiting={() => {
+            if (wantPlaying.current) setMessage("Buffering…");
+          }}
+          onError={() => retryOrGiveUp("The stream dropped.")}
+          onEnded={() => retryOrGiveUp("The stream ended.")}
+        />
+
+        <h1 className="sr-only">In His Presence, live radio from The Bride of Christ</h1>
+
+        <div className="relative overflow-hidden rounded-[30px] border border-navy-950/[0.07] bg-white p-7 shadow-[0_40px_90px_-50px_rgba(15,21,51,0.5)] sm:p-11">
+          {/* A warm cast of light behind the artwork, so the card has depth. */}
           <div
-            className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-3/4 bg-[radial-gradient(ellipse_at_50%_38%,rgba(226,180,87,0.16),transparent_65%)]"
+            className="pointer-events-none absolute -right-28 -top-40 h-[520px] w-[520px] bg-[radial-gradient(circle_at_50%_50%,rgba(184,137,44,0.16),transparent_64%)]"
             aria-hidden
           />
-          <audio
-            ref={audio}
-            preload="none"
-            controlsList="nodownload noplaybackrate"
-            onContextMenu={(event) => event.preventDefault()}
-            onPlaying={() => {
-              retries.current = 0;
-              setState("playing");
-              setMessage("");
-            }}
-            onWaiting={() => {
-              if (wantPlaying.current) setMessage("Buffering…");
-            }}
-            onError={() => retryOrGiveUp("The stream dropped.")}
-            onEnded={() => retryOrGiveUp("The stream ended.")}
-          />
 
-          <h1 className="sr-only">In His Presence, live radio from The Bride of Christ</h1>
-          <div className="absolute right-4 top-4 sm:static sm:flex sm:min-h-7 sm:items-center sm:justify-end">
-            {status.configured &&
-              (status.online ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-red-700">
-                  <span className="relative flex h-1.5 w-1.5" aria-hidden>
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75 motion-reduce:animate-none" />
-                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500" />
-                  </span>
-                  On air
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-wash-300 bg-sky-wash-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-navy-950/50">
-                  <span className="h-1.5 w-1.5 rounded-full bg-navy-950/30" aria-hidden />
-                  Off air
-                </span>
-              ))}
-          </div>
-
-          <div className="flex justify-center sm:mt-6">
-            <SignalDial playing={playing} />
-          </div>
-
-          <div className="mt-3 sm:mt-6" aria-live="polite">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-gold-700">Now playing</p>
-            <p className="mx-auto mt-2 line-clamp-2 max-w-md font-serif text-xl font-medium leading-tight tracking-tight text-navy-950 sm:text-[1.9rem]">
-              {song}
-            </p>
-            <p className="mx-auto mt-1.5 max-w-md truncate text-sm font-medium text-navy-950/60">
-              {artist ?? "Live from The Bride of Christ"}
-            </p>
-            {listenersLine && <p className="mt-1 text-xs text-navy-950/45">{listenersLine}</p>}
-          </div>
-
-          {status.configured && (
-            <div ref={controls} className="mt-4 flex flex-col items-center sm:mt-7">
-              <button
-                type="button"
-                onClick={active ? stop : listen}
-                aria-label={active ? "Stop listening" : "Listen live"}
-                className="flex h-16 w-16 items-center justify-center rounded-full bg-navy-900 text-white shadow-[0_0_0_8px_rgba(226,180,87,0.22),0_18px_40px_rgba(21,32,99,0.3)] transition hover:bg-navy-800 active:scale-95 sm:h-[4.5rem] sm:w-[4.5rem]"
-              >
-                {playIcon("h-6 w-6 sm:h-7 sm:w-7")}
-              </button>
-              <p className="mt-2.5 text-xs font-medium text-navy-950/55 sm:mt-4">{stateLabel}</p>
-
-              <div className="mt-4 hidden items-center gap-2 rounded-full sm:inline-flex border border-sky-wash-200 bg-sky-wash-50 p-1 sm:pr-4">
-                <button
-                  type="button"
-                  onClick={toggleMute}
-                  aria-label={muted ? "Unmute" : "Mute"}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-navy-950/60 transition hover:bg-white hover:text-navy-950"
-                >
-                  {muted ? <VolumeX className="h-4 w-4" aria-hidden /> : <Volume2 className="h-4 w-4" aria-hidden />}
-                </button>
-                <label className="sr-only" htmlFor="podcast-volume">Volume</label>
-                <input
-                  id="podcast-volume"
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={muted ? 0 : volume}
-                  onChange={(event) => changeVolume(Number(event.target.value))}
-                  style={volumeFill}
-                  className="volume-range hidden w-32 sm:block"
-                />
-              </div>
+          <div className="relative flex flex-col items-center gap-7 text-center sm:flex-row sm:items-center sm:gap-9 sm:text-left">
+            <div className="relative h-[150px] w-[150px] shrink-0 overflow-hidden rounded-[26px] border border-navy-950/[0.08] bg-white shadow-[0_34px_70px_-34px_rgba(15,21,51,0.65)] sm:h-[212px] sm:w-[212px]">
+              <Image src="/logo.png" alt="" fill priority sizes="212px" className="scale-[1.08] object-cover" />
             </div>
-          )}
 
-          {message && (
-            <p
-              role={state === "error" ? "alert" : "status"}
-              className={`mx-auto mt-4 max-w-sm rounded-xl border px-3 py-2 text-xs font-medium ${state === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-sky-wash-200 bg-sky-wash-50 text-navy-950/70"}`}
-            >
-              {message}
-            </p>
-          )}
-        </section>
+            <div className="flex min-w-0 flex-col gap-4" aria-live="polite">
+              <div className="flex items-center justify-center gap-3 sm:justify-start">
+                {status.configured &&
+                  (status.online ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-red-700">
+                      <span className="relative flex h-1.5 w-1.5" aria-hidden>
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75 motion-reduce:animate-none" />
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500" />
+                      </span>
+                      On air
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-haze-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-navy-950/50">
+                      <span className="h-1.5 w-1.5 rounded-full bg-navy-950/30" aria-hidden />
+                      Off air
+                    </span>
+                  ))}
+                <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-navy-950/40">Now playing</span>
+                {playing && <Equalizer />}
+              </div>
 
-        {children}
-      </div>
+              <p className="line-clamp-2 font-serif text-[1.75rem] font-medium leading-[1.08] tracking-[-0.01em] text-navy-950 sm:text-[2.5rem]">
+                {song}
+              </p>
+              <p className="truncate text-sm text-navy-950/55 sm:text-base">
+                {artist ?? "Live from The Bride of Christ"}
+              </p>
+
+              {status.configured && (
+                <div ref={controls} className="mt-2 flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
+                  <button
+                    type="button"
+                    onClick={active ? stop : listen}
+                    className="inline-flex h-[54px] min-w-48 items-center justify-center gap-2.5 rounded-full bg-navy-900 px-7 text-[15px] font-bold text-white shadow-[0_20px_44px_-20px_rgba(22,32,94,0.75)] transition hover:bg-navy-800 active:scale-[0.98]"
+                  >
+                    {playIcon("h-4 w-4")}
+                    {state === "connecting" ? "Connecting…" : state === "reconnecting" ? "Reconnecting…" : playing ? "Stop" : "Listen live"}
+                  </button>
+
+                  <div className="hidden items-center gap-3 sm:flex">
+                    <button
+                      type="button"
+                      onClick={toggleMute}
+                      aria-label={muted ? "Unmute" : "Mute"}
+                      className="flex h-9 w-9 items-center justify-center rounded-full text-navy-950/45 transition hover:bg-haze-100 hover:text-navy-950"
+                    >
+                      {muted ? <VolumeX className="h-[18px] w-[18px]" aria-hidden /> : <Volume2 className="h-[18px] w-[18px]" aria-hidden />}
+                    </button>
+                    <label className="sr-only" htmlFor="podcast-volume">Volume</label>
+                    <input
+                      id="podcast-volume"
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={muted ? 0 : volume}
+                      onChange={(event) => changeVolume(Number(event.target.value))}
+                      style={volumeFill}
+                      className="volume-range w-[120px]"
+                    />
+                  </div>
+
+                  {stateLabel && <p className="text-xs text-navy-950/45">{stateLabel}</p>}
+                </div>
+              )}
+
+              {message && (
+                <p
+                  role={state === "error" ? "alert" : "status"}
+                  className={`inline-block rounded-lg px-3 py-2 text-xs font-medium ${state === "error" ? "bg-red-50 text-red-700" : "bg-haze-100 text-navy-950/70"}`}
+                >
+                  {message}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* The mini player, once the main controls have scrolled away. */}
       {status.configured && controlsPassed && (
         <div className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] lg:hidden">
-          <div className="mx-auto flex max-w-xl items-center gap-3 rounded-2xl border border-sky-wash-200 bg-white/90 p-2 pr-2.5 shadow-[0_20px_50px_-10px_rgba(21,32,99,0.3)] backdrop-blur-xl">
-            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-white ring-1 ring-gold-400/60" aria-hidden>
-              <Image src="/logo.png" alt="" fill sizes="44px" className="scale-[1.16] object-cover" />
+          <div className="mx-auto flex max-w-xl items-center gap-3 rounded-2xl border border-navy-950/[0.07] bg-white/95 p-2 pr-2.5 shadow-[0_22px_50px_-20px_rgba(15,21,51,0.6)] backdrop-blur-xl">
+            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-navy-950/10" aria-hidden>
+              <Image src="/logo.png" alt="" fill sizes="44px" className="scale-[1.08] object-cover" />
             </div>
             <div className="min-w-0 flex-1 text-left">
               <p className="truncate text-sm font-semibold text-navy-950">{song}</p>
               <p className="truncate text-xs text-navy-950/55">
-                {playing ? "Listening live" : busy ? stateLabel : artist ?? "In His Presence"}
+                {playing ? "Listening live" : busy ? stateLabel || "Connecting…" : artist ?? "In His Presence"}
                 {playing && artist ? ` · ${artist}` : ""}
               </p>
             </div>

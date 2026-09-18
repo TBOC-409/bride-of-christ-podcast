@@ -100,6 +100,28 @@ const SEPARATED_SITE = new RegExp(
 /** A bare " www.site.gh" at the end, with no separator. */
 const BARE_SITE = new RegExp(`\\s+(?:https?:\\/\\/)?www\\.\\S+\\s*$`, "i");
 
+/** A "|" part that advertises a website, as in "GospelEmpireGh.Com". */
+const SITE_PART = new RegExp(`(?:www\\.|https?:\\/\\/|\\.${SITE_ENDING}\\b)`, "i");
+/** A "|" part selling something: "Call/WhatsApp: 233 558856705", "Promo", "Download". */
+const CONTACT_PART = /\b(?:call|whats\s?app|tel|phone|contact|promo(?:tion)?|download|subscribe)\b|\+?\d[\d\s()-]{7,}/i;
+/** A "|" part with nothing to read, such as "..". */
+const EMPTY_PART = /^[^\p{L}\p{N}]+$/u;
+
+/**
+ * Stations often bolt adverts onto a song with "|", as this one does with
+ * "Don Simon - Bless Me | GospelEmpireGh.Com | Call/WhatsApp: 233 558856705".
+ * Those parts are dropped and the music is kept. If every part looks like an
+ * advert the title is left alone, rather than showing nothing.
+ */
+export function dropAdverts(text: string): string {
+  if (!text.includes("|")) return text;
+  const parts = text.split("|").map((part) => part.trim());
+  const kept = parts.filter(
+    (part) => part && !SITE_PART.test(part) && !CONTACT_PART.test(part) && !EMPTY_PART.test(part),
+  );
+  return kept.length ? kept.join(" | ") : text;
+}
+
 /** A raw audio file name, e.g. "enough is enough nana bonsu.wma". */
 const AUDIO_FILE = /\.(?:mp3|wma|m4a|aac|wav|flac|ogg|opus|amr)\s*$/i;
 /** Leading track numbers in a file name: "04 04 ", "01. ", "1-". */
@@ -131,7 +153,7 @@ export function capitaliseTitle(title: string): string {
  */
 export function tidyTitle(text: string | null | undefined): string | null {
   if (typeof text !== "string") return null;
-  let tidy = text.replace(BRACKETED_SITE, " ").replace(SEPARATED_SITE, "").replace(BARE_SITE, "").trim();
+  let tidy = dropAdverts(text).replace(BRACKETED_SITE, " ").replace(SEPARATED_SITE, "").replace(BARE_SITE, "").trim();
 
   // Some tracks announce their raw file name. Only then are leading numbers
   // treated as track numbers, so a programme such as "2 Chronicles 7:14 Prayer"
@@ -141,7 +163,9 @@ export function tidyTitle(text: string | null | undefined): string | null {
     if (/^\d+$/.test(tidy.trim())) return null;
   }
 
-  tidy = tidy.replace(/\s+/g, " ").replace(/\s+-\s*$/, "").trim();
+  // Removing a website tag can leave the separator that introduced it, as in
+  // "Aseda |". Tidy away any separator left hanging at either end.
+  tidy = tidy.replace(/\s+/g, " ").replace(/[\s|\u2022~/\u2013\u2014-]+$/, "").replace(/^[\s|\u2022~/\u2013\u2014]+/, "").trim();
   if (PLACEHOLDER_TITLES.has(tidy.toLowerCase())) return null;
   return capitaliseTitle(tidy).slice(0, 200);
 }

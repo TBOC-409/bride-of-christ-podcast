@@ -119,7 +119,7 @@ export function InstallApp() {
       <button
         type="button"
         onClick={install}
-        className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-navy-900/15 bg-white px-3.5 text-xs font-semibold text-navy-900 transition hover:border-gold-500 hover:bg-sky-wash-50"
+        className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-haze-200 bg-white px-3.5 text-xs font-semibold text-navy-900 transition hover:border-navy-900/30"
       >
         <Download className="h-3.5 w-3.5" aria-hidden />
         Install app
@@ -128,17 +128,17 @@ export function InstallApp() {
       {/* Rendered straight into the body: the header's blur effect would
           otherwise pin this "fixed" banner to the header instead of the screen. */}
       {!bannerHidden && createPortal(
-        <aside className="fixed inset-x-3 bottom-3 z-[100] mx-auto max-w-sm rounded-2xl border border-sky-wash-200 bg-white/95 p-4 shadow-[0_20px_50px_-10px_rgba(21,32,99,0.3)] backdrop-blur-xl sm:inset-x-auto sm:bottom-5 sm:right-5 sm:mx-0">
+        <aside className="fixed inset-x-3 bottom-3 z-[100] mx-auto max-w-sm rounded-2xl border border-haze-200 bg-white/95 p-4 shadow-[0_18px_40px_-16px_rgba(13,20,64,0.45)] backdrop-blur-xl sm:inset-x-auto sm:bottom-5 sm:right-5 sm:mx-0">
           <button
             type="button"
             onClick={dismiss}
             aria-label="Dismiss install prompt"
-            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full text-navy-950/40 transition hover:bg-sky-wash-100 hover:text-navy-950"
+            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full text-navy-950/40 transition hover:bg-haze-100 hover:text-navy-950"
           >
             <X className="h-4 w-4" aria-hidden />
           </button>
           <div className="flex gap-3 pr-7">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gold-400/20 text-gold-700">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-haze-100 text-navy-900">
               <Download className="h-5 w-5" aria-hidden />
             </span>
             <div>
@@ -149,7 +149,7 @@ export function InstallApp() {
             </div>
           </div>
           {showIosHelp ? (
-            <p className="mt-3 flex items-start gap-2 rounded-xl bg-sky-wash-100 p-3 text-xs leading-5 text-navy-950/75">
+            <p className="mt-3 flex items-start gap-2 rounded-xl bg-haze-100 p-3 text-xs leading-5 text-navy-950/70">
               <Share className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
               Tap the Share button in your browser, then choose “Add to Home Screen”.
             </p>

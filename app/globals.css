@@ -1,163 +1,78 @@
 @import "tailwindcss";
 
 /*
- * In His Presence: a calm light blue, with the navy and gold of the church logo.
- * The player and the journal share one card style so the page reads as a
- * single whole.
+ * In His Presence: the Daylight design. A light room with white cards that
+ * carry real depth, the logo's navy for type and controls, and gold for small
+ * details. Newsreader sets what is playing; Manrope does the rest.
  */
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-serif: var(--font-fraunces);
+  --font-sans: var(--font-manrope);
+  --font-serif: var(--font-newsreader);
 
-  --color-sky-wash-50: #f7fbff;
-  --color-sky-wash-100: #dde9fb;
-  --color-sky-wash-200: #d6e5f8;
-  --color-sky-wash-300: #bfd5f2;
-  --color-navy-950: #0d1440;
-  --color-navy-900: #152063;
-  --color-navy-800: #1d2c86;
+  --color-haze-50: #f8f9fc;
+  --color-haze-100: #f2f4f8;
+  --color-haze-200: #e4e7ef;
+  --color-haze-300: #cfd4e2;
+  --color-navy-950: #0f1533;
+  --color-navy-900: #16205e;
+  --color-navy-800: #202c73;
   --color-navy-700: #2a3fb0;
   --color-gold-300: #efd08a;
   --color-gold-400: #e2b457;
   --color-gold-500: #c99a3a;
-  --color-gold-600: #a87c26;
+  --color-gold-600: #b8892c;
   --color-gold-700: #8a6519;
 }
 
 body {
-  background-color: var(--color-sky-wash-100);
+  background-color: var(--color-haze-100);
   color: var(--color-navy-950);
   font-family: var(--font-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-/* A clear light-blue sky: brighter at the top, with a faint warmth of gold below. */
-.presence-light {
-  background:
-    radial-gradient(ellipse 55rem 34rem at 50% -10%, rgba(255, 255, 255, 0.55), transparent 70%),
-    radial-gradient(ellipse 45rem 30rem at 100% 0%, rgba(120, 170, 240, 0.35), transparent 70%),
-    radial-gradient(ellipse 40rem 30rem at 0% 100%, rgba(226, 180, 87, 0.1), transparent 70%),
-    var(--color-sky-wash-100);
-  background-attachment: fixed;
+/* The station strip under the header: scrolls gently, never demanding. */
+.notice-ticker {
+  mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
 }
 
-/* ---- The on-air band: scrolls like a station ticker. ---- */
-
-.on-air-ticker {
-  mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
-}
-
-.on-air-track {
+.notice-track {
   display: flex;
   width: max-content;
-  animation: on-air-scroll 45s linear infinite;
+  animation: notice-scroll 42s linear infinite;
 }
 
-@keyframes on-air-scroll {
+@keyframes notice-scroll {
   to { transform: translateX(-50%); }
 }
 
-/* ---- The signal dial: the logo, still, inside a ring of signal bars. ---- */
-
-.signal-dial {
-  /* Compact on phones, so the radio card stays shorter than the journal. */
-  --dial: min(46vw, 11.5rem);
-  position: relative;
-  width: var(--dial);
-  height: var(--dial);
+/* Four bars beside the on-air badge: moving while audio plays, resting otherwise. */
+.eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 0.875rem;
 }
 
-@media (min-width: 40rem) {
-  .signal-dial {
-    --dial: 19rem;
-  }
-}
-
-.signal-bars > span {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 0;
-  height: 0;
-}
-
-/* Each bar stands on a circle just outside the logo and grows outward. */
-.signal-bars > span > i {
-  position: absolute;
-  left: -1.5px;
-  bottom: calc(var(--dial) * 0.355);
+.eq > span {
   width: 3px;
-  height: calc(var(--dial) * 0.13);
+  height: 100%;
   border-radius: 999px;
-  background: linear-gradient(to top, var(--color-gold-500), rgba(201, 154, 58, 0.08));
+  background: var(--color-navy-700);
   transform-origin: bottom;
-  transform: scaleY(0.16);
-  opacity: 0.5;
-  transition: opacity 0.4s ease;
+  transform: scaleY(0.25);
+  animation: eq-bar 0.9s ease-in-out infinite alternate;
 }
 
-.signal-dial[data-playing="true"] .signal-bars > span > i {
-  opacity: 1;
-  animation-name: signal-bar;
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-  animation-direction: alternate;
-}
+.eq > span:nth-child(2) { animation-delay: -0.35s; }
+.eq > span:nth-child(3) { animation-delay: -0.6s; }
+.eq > span:nth-child(4) { animation-delay: -0.15s; }
 
-@keyframes signal-bar {
-  from { transform: scaleY(0.14); }
+@keyframes eq-bar {
+  from { transform: scaleY(0.25); }
   to { transform: scaleY(1); }
-}
-
-/* A warm glow behind the logo that gently brightens while audio plays. */
-.signal-halo {
-  position: absolute;
-  inset: 10%;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(226, 180, 87, 0.45), rgba(226, 180, 87, 0) 70%);
-  opacity: 0.5;
-  transition: opacity 0.6s ease;
-}
-
-.signal-dial[data-playing="true"] .signal-halo {
-  animation: signal-breathe 4s ease-in-out infinite;
-}
-
-@keyframes signal-breathe {
-  0%, 100% { opacity: 0.55; transform: scale(0.97); }
-  50% { opacity: 1; transform: scale(1.05); }
-}
-
-.signal-ring {
-  position: absolute;
-  inset: 13%;
-  border-radius: 999px;
-  border: 1px solid rgba(201, 154, 58, 0.5);
-}
-
-.signal-disc {
-  position: absolute;
-  inset: 17%;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #fff;
-  box-shadow: 0 18px 40px rgba(21, 32, 99, 0.18);
-}
-
-/* ---- The journal: ruled lines with a gold margin, scrolling with the writing. ---- */
-
-.journal-lines {
-  --line: 1.75rem;
-  line-height: var(--line);
-  padding: 0.5rem 1rem 0.5rem 3.25rem;
-  background-image:
-    linear-gradient(90deg, transparent 2.4rem, rgba(201, 154, 58, 0.5) 2.4rem, rgba(201, 154, 58, 0.5) calc(2.4rem + 1px), transparent calc(2.4rem + 1px)),
-    linear-gradient(transparent calc(var(--line) - 1px), rgba(21, 32, 99, 0.09) calc(var(--line) - 1px));
-  background-size: 100% 100%, 100% var(--line);
-  background-position: 0 0, 0 0.5rem;
-  background-attachment: local;
 }
 
 /* A slim volume bar. --fill is how far along it is, set from the volume. */
@@ -166,7 +81,7 @@ body {
   -webkit-appearance: none;
   height: 4px;
   border-radius: 999px;
-  background: linear-gradient(to right, var(--color-navy-900) var(--fill), var(--color-sky-wash-300) var(--fill));
+  background: linear-gradient(to right, var(--color-navy-900) var(--fill), var(--color-haze-300) var(--fill));
   cursor: pointer;
 }
 
@@ -196,12 +111,11 @@ body {
 
 /* Motion is decoration here; switch it off for anyone who asks their device to. */
 @media (prefers-reduced-motion: reduce) {
-  .on-air-track,
-  .signal-dial[data-playing="true"] .signal-halo {
+  .notice-track {
     animation: none;
   }
-  .signal-dial[data-playing="true"] .signal-bars > span > i {
+  .eq > span {
     animation: none;
-    transform: scaleY(0.55);
+    transform: scaleY(0.6);
   }
 }

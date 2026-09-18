@@ -132,21 +132,34 @@ export function PodcastNotepad() {
   const words = notes.trim() ? notes.trim().split(/\s+/).length : 0;
 
   return (
-    <section className="rounded-[2rem] border border-sky-wash-200 bg-white/85 p-5 text-navy-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_30px_80px_-30px_rgba(21,32,99,0.25)] sm:p-7">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-gold-700">Listening journal</p>
-      <h2 className="mt-1.5 font-serif text-2xl font-medium leading-tight tracking-tight sm:text-[1.75rem]">
-        {longDayLabel(day)}
-      </h2>
+    <section className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+      <div className="rounded-[30px] border border-navy-950/[0.07] bg-white p-7 shadow-[0_40px_90px_-60px_rgba(15,21,51,0.5)] sm:p-9">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-navy-950/40">Listening journal</p>
+          <h2 className="mt-1.5 font-serif text-2xl font-medium leading-tight tracking-tight sm:text-3xl">
+            {longDayLabel(day)}
+          </h2>
+        </div>
 
-      {/* The page itself: a toolbar, the ruled sheet, and a status line. */}
-      <div className="mt-5 overflow-hidden rounded-2xl border border-sky-wash-200 bg-sky-wash-50 transition focus-within:border-gold-500 focus-within:ring-4 focus-within:ring-gold-400/20">
-        <div className="flex items-center justify-between gap-3 border-b border-sky-wash-200 bg-white/80 px-3 py-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <p aria-live="polite" className="mr-1 text-xs font-medium text-navy-950/50">
+            {saved ? (
+              <span className="inline-flex items-center gap-1 text-emerald-700">
+                <Check className="h-3.5 w-3.5" aria-hidden />Saved
+              </span>
+            ) : notes ? (
+              "Writing…"
+            ) : (
+              ""
+            )}
+          </p>
           <label className="sr-only" htmlFor="notes-day">Choose which day&apos;s notes to show</label>
           <select
             id="notes-day"
             value={day}
             onChange={(event) => openDay(event.target.value)}
-            className="min-h-8 rounded-full border border-sky-wash-300 bg-white pl-3 pr-2 text-xs font-semibold text-navy-900 outline-none focus:border-gold-500"
+            className="h-9 rounded-lg border border-navy-950/[0.12] bg-white pl-3 pr-2 text-xs font-semibold text-navy-900 outline-none transition focus:border-navy-900/40 focus:ring-4 focus:ring-navy-900/5"
           >
             {choices.map((choice) => (
               <option key={choice} value={choice}>
@@ -155,40 +168,29 @@ export function PodcastNotepad() {
               </option>
             ))}
           </select>
-          <div className="flex items-center gap-1.5">
-            <p aria-live="polite" className="mr-1 text-xs font-medium text-navy-950/50">
-              {saved ? (
-                <span className="inline-flex items-center gap-1 text-emerald-700">
-                  <Check className="h-3.5 w-3.5" aria-hidden />Saved
-                </span>
-              ) : notes ? (
-                "Writing…"
-              ) : (
-                ""
-              )}
-            </p>
-            <button
-              type="button"
-              onClick={saveToFile}
-              disabled={!notes}
-              title="Save these notes to a file"
-              className="inline-flex h-8 items-center gap-1.5 rounded-full border border-sky-wash-300 bg-white px-3 text-xs font-semibold text-navy-900 transition hover:border-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Download className="h-3.5 w-3.5" aria-hidden />Save
-            </button>
-            <button
-              type="button"
-              onClick={deleteDay}
-              disabled={!notes}
-              aria-label="Delete these notes"
-              title="Delete these notes"
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-sky-wash-300 bg-white text-navy-950/55 transition hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Trash2 className="h-3.5 w-3.5" aria-hidden />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={saveToFile}
+            disabled={!notes}
+            title="Save these notes to a file"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-navy-950/[0.12] bg-white px-3 text-xs font-semibold text-navy-900 transition hover:border-navy-900/30 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Download className="h-3.5 w-3.5" aria-hidden />Save
+          </button>
+          <button
+            type="button"
+            onClick={deleteDay}
+            disabled={!notes}
+            aria-label="Delete these notes"
+            title="Delete these notes"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-navy-950/[0.12] bg-white text-navy-950/55 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Trash2 className="h-3.5 w-3.5" aria-hidden />
+          </button>
         </div>
+      </div>
 
+      <div className="mt-5 overflow-hidden rounded-2xl border border-navy-950/[0.09] bg-haze-50 transition focus-within:border-navy-900/30 focus-within:ring-4 focus-within:ring-navy-900/5">
         <label className="sr-only" htmlFor="podcast-notes">Your notes</label>
         <textarea
           id="podcast-notes"
@@ -196,20 +198,20 @@ export function PodcastNotepad() {
           value={notes}
           onChange={(event) => update(event.target.value)}
           placeholder="Write down what speaks to you as you listen…"
-          className="journal-lines block min-h-[35rem] w-full resize-y bg-transparent text-base text-navy-950 outline-none placeholder:italic placeholder:text-navy-950/35 lg:min-h-[37.5rem]"
+          className="block min-h-[22rem] w-full resize-y bg-transparent p-5 text-[15px] leading-[1.9] text-navy-950 outline-none placeholder:text-navy-950/35 sm:min-h-[26rem] sm:p-7 sm:text-base"
         />
-
-        <div className="flex items-center justify-between gap-3 border-t border-sky-wash-200 bg-white/80 px-3 py-2 text-xs text-navy-950/50">
+        <div className="flex items-center justify-between gap-3 border-t border-navy-950/[0.08] bg-white px-5 py-3 text-xs text-navy-950/50 sm:px-7">
           <span className="inline-flex min-w-0 items-center gap-1.5">
             <LockKeyhole className="h-3.5 w-3.5 shrink-0 text-gold-600" aria-hidden />
             <span className="truncate">
               Private to this browser<span className="hidden sm:inline"> · a fresh page each day</span>
             </span>
           </span>
-          <span className="shrink-0 font-serif italic tabular-nums">
+          <span className="shrink-0 tabular-nums">
             {words} {words === 1 ? "word" : "words"}
           </span>
         </div>
+      </div>
       </div>
     </section>
   );

@@ -1,25 +1,22 @@
 /** Shaped like the listen page, so nothing jumps when it arrives. */
 export default function Loading() {
-  const card = "rounded-[2rem] border border-sky-wash-200 bg-white/70";
   return (
     <div className="animate-pulse" aria-busy="true" aria-label="Loading the radio">
-      <div className="h-9 border-b border-sky-wash-200 bg-white/50" />
-      <div className="mx-auto grid max-w-6xl gap-6 px-4 pt-6 sm:px-6 sm:pt-10 lg:grid-cols-[1fr_1fr] lg:items-start lg:gap-8 lg:px-8">
-        <div className={`${card} flex flex-col items-center px-5 pb-7 pt-6 sm:px-10 sm:pb-10`}>
-          <div className="h-5 w-40 self-start rounded bg-sky-wash-200" />
-          <div className="mt-6 aspect-square w-[min(74vw,19rem)] rounded-full border border-sky-wash-300 p-[17%]">
-            <div className="h-full w-full rounded-full bg-sky-wash-200" />
+      <div className="border-b border-haze-200 bg-white">
+        <div className="mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 py-8 sm:flex-row sm:gap-8 sm:px-6 sm:py-12 lg:px-8">
+          <div className="h-28 w-28 shrink-0 rounded-3xl bg-haze-200 sm:h-36 sm:w-36" />
+          <div className="w-full flex-1">
+            <div className="h-3 w-40 rounded-full bg-haze-200" />
+            <div className="mt-4 h-9 w-3/4 rounded bg-haze-200 sm:h-12" />
+            <div className="mt-3 h-4 w-40 rounded bg-haze-100" />
+            <div className="mt-6 h-12 w-44 rounded-full bg-haze-200" />
           </div>
-          <div className="mt-6 h-3 w-24 rounded-full bg-sky-wash-200" />
-          <div className="mt-3 h-8 w-64 max-w-full rounded bg-sky-wash-200" />
-          <div className="mt-8 h-20 w-20 rounded-full bg-navy-900/15" />
         </div>
-        <div className={`${card} p-5 sm:p-7`}>
-          <div className="h-3 w-28 rounded-full bg-sky-wash-200" />
-          <div className="mt-3 h-8 w-56 rounded bg-sky-wash-200" />
-          <div className="mt-4 h-10 w-32 rounded-full bg-sky-wash-200" />
-          <div className="mt-4 h-64 rounded-2xl bg-sky-wash-100 sm:h-80" />
-        </div>
+      </div>
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+        <div className="h-3 w-32 rounded-full bg-haze-200" />
+        <div className="mt-3 h-8 w-64 rounded bg-haze-200" />
+        <div className="mt-4 h-96 rounded-2xl border border-haze-200 bg-white sm:h-[30rem]" />
       </div>
     </div>
   );
