@@ -1,10 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { Loader2, Play, Square, Volume2, VolumeX } from "lucide-react";
+import { ExternalLink, Headphones, Loader2, Play, Square, Tv, Volume2, VolumeX } from "lucide-react";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 import type { StreamStatus } from "@/lib/icecast";
 import { HEARTBEAT_MS } from "@/lib/listeners";
+import { liveWatchUrl } from "@/lib/youtube";
+import { YoutubeWatch } from "./youtube-watch";
 
 /** How often "now playing" refreshes while the page is open. */
 const POLL_MS = 20_000;
@@ -94,7 +96,16 @@ function splitTitle(title: string): { song: string; artist: string | null } {
  * download, and the address is fetched when someone presses Listen rather than
  * written into the page. Neither stops a determined listener recording it.
  */
-export function PodcastPlayer({ initialStatus, stripLines }: { initialStatus: StreamStatus; stripLines: string[] }) {
+export function PodcastPlayer({
+  initialStatus,
+  stripLines,
+  youtubeChannelId,
+}: {
+  initialStatus: StreamStatus;
+  stripLines: string[];
+  /** Null when no channel is set, which hides watching altogether. */
+  youtubeChannelId: string | null;
+}) {
   const audio = useRef<HTMLAudioElement | null>(null);
   /** True from pressing Listen until pressing Stop, so drops can be retried. */
   const wantPlaying = useRef(false);
@@ -105,6 +116,8 @@ export function PodcastPlayer({ initialStatus, stripLines }: { initialStatus: St
   const [message, setMessage] = useState("");
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(0.9);
+  /** Listening to the radio, or watching the broadcast on YouTube. */
+  const [mode, setMode] = useState<"listen" | "watch">("listen");
   const controls = useRef<HTMLDivElement | null>(null);
   /** True once the main controls have scrolled up out of view, to show the mini player. */
   const [controlsPassed, setControlsPassed] = useState(false);
@@ -263,6 +276,26 @@ export function PodcastPlayer({ initialStatus, stripLines }: { initialStatus: St
     setMessage("");
   }
 
+  // Only one of the two ever plays: starting the video stops the radio, so a
+  // listener never hears the stream and the broadcast at once.
+  function watch() {
+    if (active) stop();
+    setMode("watch");
+  }
+
+  function backToListening() {
+    setMode("listen");
+  }
+
+  // The broadcast has finished. Rather than leave a dead player on screen, the
+  // radio is brought back and started, since it never stops.
+  function broadcastEnded() {
+    setMode("listen");
+    // After listen(), which clears any earlier message of its own.
+    listen();
+    setMessage("The live broadcast has ended. Back to the radio.");
+  }
+
   function changeVolume(next: number) {
     setVolume(next);
     if (audio.current) audio.current.volume = next;
@@ -289,6 +322,7 @@ export function PodcastPlayer({ initialStatus, stripLines }: { initialStatus: St
   const { song, artist } = status.online && status.title ? splitTitle(status.title) : { song: nowPlaying, artist: null };
   const stateLabel =
     state === "connecting" ? "Connecting…" : state === "reconnecting" ? "Reconnecting…" : playing ? "You are listening live" : "";
+  const watching = mode === "watch";
   const volumeFill = { "--fill": `${Math.round((muted ? 0 : volume) * 100)}%` } as CSSProperties;
 
   const playIcon = (size: string) =>
@@ -334,10 +368,18 @@ export function PodcastPlayer({ initialStatus, stripLines }: { initialStatus: St
             aria-hidden
           />
 
-          <div className="relative flex flex-col items-center gap-7 text-center sm:flex-row sm:items-center sm:gap-9 sm:text-left">
-            <div className="relative h-[150px] w-[150px] shrink-0 overflow-hidden rounded-[26px] border border-navy-950/[0.08] bg-white shadow-[0_34px_70px_-34px_rgba(15,21,51,0.65)] sm:h-[212px] sm:w-[212px]">
-              <Image src="/logo.png" alt="" fill priority sizes="212px" className="scale-[1.08] object-cover" />
-            </div>
+          <div
+            className={`relative flex flex-col items-center gap-7 text-center ${watching ? "" : "sm:flex-row sm:items-center sm:gap-9 sm:text-left"}`}
+          >
+            {watching && youtubeChannelId ? (
+              <div className="w-full overflow-hidden rounded-[22px] bg-navy-950 ring-1 ring-navy-950/10">
+                <YoutubeWatch channelId={youtubeChannelId} onEnded={broadcastEnded} />
+              </div>
+            ) : (
+              <div className="relative h-[150px] w-[150px] shrink-0 overflow-hidden rounded-[26px] border border-navy-950/[0.08] bg-white shadow-[0_34px_70px_-34px_rgba(15,21,51,0.65)] sm:h-[212px] sm:w-[212px]">
+                <Image src="/logo.png" alt="" fill priority sizes="212px" className="scale-[1.08] object-cover" />
+              </div>
+            )}
 
             <div className="flex min-w-0 flex-col gap-4" aria-live="polite">
               <div className="flex items-center justify-center gap-3 sm:justify-start">
@@ -367,7 +409,42 @@ export function PodcastPlayer({ initialStatus, stripLines }: { initialStatus: St
                 {artist ?? "Live from The Bride of Christ"}
               </p>
 
-              {status.configured && (
+              {youtubeChannelId && (
+                <div className="inline-flex self-center rounded-full border border-navy-950/[0.1] bg-haze-50 p-1 sm:self-start">
+                  <button
+                    type="button"
+                    onClick={backToListening}
+                    aria-pressed={!watching}
+                    className={`inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-xs font-bold transition ${watching ? "text-navy-950/55 hover:text-navy-950" : "bg-navy-900 text-white"}`}
+                  >
+                    <Headphones className="h-3.5 w-3.5" aria-hidden />
+                    Listen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={watch}
+                    aria-pressed={watching}
+                    className={`inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-xs font-bold transition ${watching ? "bg-navy-900 text-white" : "text-navy-950/55 hover:text-navy-950"}`}
+                  >
+                    <Tv className="h-3.5 w-3.5" aria-hidden />
+                    Watch
+                  </button>
+                </div>
+              )}
+
+              {watching && youtubeChannelId ? (
+                <a
+                  href={liveWatchUrl(youtubeChannelId)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 self-center text-xs font-medium text-navy-950/55 transition hover:text-navy-900 sm:self-start"
+                >
+                  Open on YouTube
+                  <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                </a>
+              ) : null}
+
+              {status.configured && !watching && (
                 <div ref={controls} className="mt-2 flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
                   <button
                     type="button"
@@ -418,8 +495,9 @@ export function PodcastPlayer({ initialStatus, stripLines }: { initialStatus: St
         </div>
       </section>
 
-      {/* The mini player, once the main controls have scrolled away. */}
-      {status.configured && controlsPassed && (
+      {/* The mini player, once the main controls have scrolled away. Never
+          while the video is showing, where it would start the radio over it. */}
+      {status.configured && controlsPassed && !watching && (
         <div className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] lg:hidden">
           <div className="mx-auto flex max-w-xl items-center gap-3 rounded-2xl border border-navy-950/[0.07] bg-white/95 p-2 pr-2.5 shadow-[0_22px_50px_-20px_rgba(15,21,51,0.6)] backdrop-blur-xl">
             <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-navy-950/10" aria-hidden>
