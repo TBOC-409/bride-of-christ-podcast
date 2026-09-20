@@ -13,8 +13,6 @@ const POLL_MS = 20_000;
 /** Reconnection attempts when the stream drops. */
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 3_000;
-/** Height of the sticky site header, which covers the top of the page. */
-const HEADER_PX = 64;
 /** Browser storage key for the anonymous listener ID. */
 const LISTENER_KEY = "boc-podcast-listener";
 
@@ -118,24 +116,6 @@ export function PodcastPlayer({
   const [volume, setVolume] = useState(0.9);
   /** Listening to the radio, or watching the broadcast on YouTube. */
   const [mode, setMode] = useState<"listen" | "watch">("listen");
-  const controls = useRef<HTMLDivElement | null>(null);
-  /** True once the main controls have scrolled up out of view, to show the mini player. */
-  const [controlsPassed, setControlsPassed] = useState(false);
-
-  // On phones the notepad sits below the player, so a mini player docks at the
-  // bottom while writing. On wide screens the player stays in view and it never shows.
-  useEffect(() => {
-    const element = controls.current;
-    if (!element || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver(
-      // Only once scrolled past, not while still further down a short screen.
-      ([entry]) => setControlsPassed(!entry.isIntersecting && entry.boundingClientRect.top < HEADER_PX),
-      { rootMargin: `-${HEADER_PX}px 0px 0px 0px` },
-    );
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-
   // Starts from the server's answer, then keeps "now playing" current,
   // checking again straight away when someone returns to the tab.
   useEffect(() => {
@@ -445,7 +425,7 @@ export function PodcastPlayer({
               ) : null}
 
               {status.configured && !watching && (
-                <div ref={controls} className="mt-2 flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
+                <div className="mt-2 flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
                   <button
                     type="button"
                     onClick={active ? stop : listen}
@@ -495,9 +475,10 @@ export function PodcastPlayer({
         </div>
       </section>
 
-      {/* The mini player, once the main controls have scrolled away. Never
-          while the video is showing, where it would start the radio over it. */}
-      {status.configured && controlsPassed && !watching && (
+      {/* On phones the player stays within reach at the bottom, wherever the
+          page is scrolled. Never while the video is showing, where it would
+          start the radio over it. */}
+      {status.configured && !watching && (
         <div className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] lg:hidden">
           <div className="mx-auto flex max-w-xl items-center gap-3 rounded-2xl border border-navy-950/[0.07] bg-white/95 p-2 pr-2.5 shadow-[0_22px_50px_-20px_rgba(15,21,51,0.6)] backdrop-blur-xl">
             <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-navy-950/10" aria-hidden>
