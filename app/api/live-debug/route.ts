@@ -1,35 +1,40 @@
 import { NextResponse } from "next/server";
-import { youtubeChannelId, liveWatchUrl } from "@/lib/youtube";
+import { youtubeChannelId } from "@/lib/youtube";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Temporary: what this server actually receives from YouTube, so a failure to
- * find the live broadcast can be told apart from YouTube answering differently
- * to a server than to a listener's browser. Remove once the cause is known.
- */
-export async function GET() {
-  const channelId = youtubeChannelId();
-  if (!channelId) return NextResponse.json({ error: "no channel" });
-  const agent =
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36";
+const AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36";
+
+async function look(url: string) {
   try {
-    const response = await fetch(liveWatchUrl(channelId), {
-      headers: { "User-Agent": agent, "Accept-Language": "en" },
+    const response = await fetch(url, {
+      headers: { "User-Agent": AGENT, "Accept-Language": "en" },
       cache: "no-store",
       signal: AbortSignal.timeout(6_000),
     });
-    const page = await response.text();
-    return NextResponse.json({
+    const body = await response.text();
+    return {
       status: response.status,
-      bytes: page.length,
-      redirectedTo: response.url,
-      hasCanonical: /<link rel="canonical" href="https:\/\/www\.youtube\.com\/watch\?v=/.test(page),
-      hasLiveNow: page.includes('"isLiveNow":true'),
-      consentWall: /consent\.youtube\.com|Before you continue|sign in to confirm/i.test(page),
-      firstTitle: page.match(/<title>([^<]{0,80})/)?.[1] ?? null,
-    });
+      bytes: body.length,
+      liveNow: body.includes('"isLiveNow":true'),
+      liveContent: body.includes('"isLiveContent":true'),
+      firstVideoId: body.match(/"videoId":"([A-Za-z0-9_-]{11})"|<yt:videoId>([A-Za-z0-9_-]{11})</)?.slice(1).find(Boolean) ?? null,
+      title: body.match(/<title>([^<]{0,60})/)?.[1] ?? null,
+    };
   } catch (error) {
-    return NextResponse.json({ threw: error instanceof Error ? error.message : String(error) });
+    return { threw: error instanceof Error ? error.message : String(error) };
   }
+}
+
+/** Temporary: which YouTube sources answer this server usefully. */
+export async function GET() {
+  const channelId = youtubeChannelId();
+  if (!channelId) return NextResponse.json({ error: "no channel" });
+  const [rss, embed, watch] = await Promise.all([
+    look(`https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`),
+    look("https://www.youtube.com/embed/ybbxsb8nFrQ"),
+    look("https://www.youtube.com/watch?v=ybbxsb8nFrQ"),
+  ]);
+  return NextResponse.json({ rss, embed, watch });
 }
