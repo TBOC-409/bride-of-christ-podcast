@@ -294,9 +294,12 @@ export function PodcastPlayer({
   const busy = state === "connecting" || state === "reconnecting";
   const active = busy || state === "playing";
   const playing = state === "playing";
+  // The station runs around the clock, so when the check could not be made the
+  // page says what is almost certainly true rather than declaring it off air:
+  // a listener's own browser usually reaches the stream even when ours cannot.
   const nowPlaying = !status.configured
     ? "The radio has not been set up yet."
-    : status.online
+    : status.online || status.checkFailed
       ? status.title ?? "Live now"
       : "The radio cannot be reached right now.";
   const { song, artist } = status.online && status.title ? splitTitle(status.title) : { song: nowPlaying, artist: null };
@@ -363,7 +366,7 @@ export function PodcastPlayer({
 
             <div className="flex min-w-0 flex-col gap-4" aria-live="polite">
               <div className="flex items-center justify-center gap-3 sm:justify-start">
-                {status.configured &&
+                {status.configured && !status.checkFailed &&
                   (status.online ? (
                     <span className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-red-700">
                       <span className="relative flex h-1.5 w-1.5" aria-hidden>

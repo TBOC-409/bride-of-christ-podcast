@@ -19,6 +19,12 @@ export type StreamStatus = {
   configured: boolean;
   /** The stream can be reached and is sending audio. */
   online: boolean;
+  /**
+   * True when the check itself could not be made, rather than the stream being
+   * off. Hosts often refuse requests from a server while serving listeners'
+   * browsers perfectly well, so "not checked" must not be shown as "off air".
+   */
+  checkFailed: boolean;
   /** What is playing now, a programme or a song, as the stream announces it. */
   title: string | null;
   /** Only available from a self-hosted Icecast status page. */
@@ -44,6 +50,9 @@ const PROBE_TIMEOUT_MS = 7_000;
 const CACHE_MS = 10_000;
 /** A metadata block can be at most 255 x 16 bytes. */
 const MAX_METADATA_BYTES = 255 * 16;
+/** Streaming hosts routinely refuse a request that does not look like a listener. */
+const LISTENER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36";
 
 /** Values Icecast reports when the broadcaster never named the stream. */
 const PLACEHOLDER_TITLES = new Set(["", "-", "unspecified name", "unspecified description", "no name", "untitled"]);
@@ -252,21 +261,26 @@ export async function readIcyTitle(response: Response): Promise<string | null> {
   }
 }
 
-async function probeStream(stream: string): Promise<{ online: boolean; format: string | null; title: string | null }> {
+async function probeStream(
+  stream: string,
+): Promise<{ online: boolean; format: string | null; title: string | null; failed: boolean }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   try {
     const response = await fetch(stream, {
       signal: controller.signal,
       cache: "no-store",
-      headers: { "Icy-MetaData": "1" },
+      headers: { "Icy-MetaData": "1", "User-Agent": LISTENER_AGENT },
     });
     const format = response.headers.get("content-type");
     const online = response.ok && /^(audio\/|application\/ogg)/i.test(format ?? "");
     const title = online ? await readIcyTitle(response) : null;
-    return { online, format, title };
+    // A refusal is an answer about us, not about the stream.
+    const failed = !response.ok && (response.status === 401 || response.status === 403 || response.status >= 500);
+    return { online, format, title, failed };
   } catch {
-    return { online: false, format: null, title: null };
+    // Nothing came back at all: the check failed rather than the stream being off.
+    return { online: false, format: null, title: null, failed: true };
   } finally {
     clearTimeout(timer);
     // Stop downloading audio as soon as the question is answered.
@@ -279,12 +293,12 @@ export async function readStreamStatus(): Promise<StreamStatus> {
   const checkedAt = new Date().toISOString();
   const stream = streamUrl();
   if (!stream) {
-    return { configured: false, online: false, title: null, listeners: null, detectedBy: null, checkedAt, problems: [] };
+    return { configured: false, online: false, checkFailed: false, title: null, listeners: null, detectedBy: null, checkedAt, problems: [] };
   }
 
   const addressProblems = problemsWith(stream);
   if (addressProblems.some((problem) => problem.includes("not a valid"))) {
-    return { configured: true, online: false, title: null, listeners: null, detectedBy: null, checkedAt, problems: addressProblems };
+    return { configured: true, online: false, checkFailed: false, title: null, listeners: null, detectedBy: null, checkedAt, problems: addressProblems };
   }
 
   try {
@@ -298,6 +312,7 @@ export async function readStreamStatus(): Promise<StreamStatus> {
         return {
           configured: true,
           online: true,
+          checkFailed: false,
           title: cleanTitle(source),
           listeners: typeof source.listeners === "number" ? source.listeners : null,
           detectedBy: "status-page",
@@ -318,6 +333,7 @@ export async function readStreamStatus(): Promise<StreamStatus> {
   return {
     configured: true,
     online: probe.online,
+    checkFailed: probe.failed,
     title: probe.title,
     listeners: null,
     detectedBy: "stream",
