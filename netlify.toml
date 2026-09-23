@@ -1,0 +1,13 @@
+# Netlify build settings for the radio site.
+#
+# The site reads STREAM_URL (the listening address), CHURCH_SITE_URL (where the
+# scrolling strip's wording comes from) and NEXT_PUBLIC_SITE_URL. None of them
+# are secrets: they are public addresses that appear in the pages, so they must
+# not be marked as secret values, or Netlify's scanner fails the build.
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
