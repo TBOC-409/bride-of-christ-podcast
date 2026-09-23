@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { liveEmbedUrl } from "@/lib/youtube";
+import { videoEmbedUrl } from "@/lib/youtube";
 
 /** YouTube's player API, which reports when the broadcast stops. */
 type YouTubePlayer = { destroy: () => void };
@@ -49,7 +49,7 @@ function loadPlayerApi(): Promise<YouTubeApi | null> {
  * back to the radio rather than leaving them on a finished stream. If YouTube's
  * API cannot be reached the video still plays; only that handover is lost.
  */
-export function YoutubeWatch({ channelId, onEnded }: { channelId: string; onEnded: () => void }) {
+export function YoutubeWatch({ videoId, onEnded }: { videoId: string; onEnded: () => void }) {
   const frame = useRef<HTMLIFrameElement | null>(null);
   const ended = useRef(onEnded);
 
@@ -84,7 +84,7 @@ export function YoutubeWatch({ channelId, onEnded }: { channelId: string; onEnde
     <iframe
       ref={frame}
       title="The Bride of Christ live on YouTube"
-      src={`${liveEmbedUrl(channelId)}&enablejsapi=1`}
+      src={`${videoEmbedUrl(videoId)}&enablejsapi=1`}
       allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share"
       allowFullScreen
       className="aspect-video w-full"

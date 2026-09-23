@@ -98,11 +98,14 @@ export function PodcastPlayer({
   initialStatus,
   stripLines,
   youtubeChannelId,
+  liveVideoId,
 }: {
   initialStatus: StreamStatus;
   stripLines: string[];
   /** Null when no channel is set, which hides watching altogether. */
   youtubeChannelId: string | null;
+  /** The broadcast on air when the page was built, or null when none is. */
+  liveVideoId: string | null;
 }) {
   const audio = useRef<HTMLAudioElement | null>(null);
   /** True from pressing Listen until pressing Stop, so drops can be retried. */
@@ -355,9 +358,20 @@ export function PodcastPlayer({
             className={`relative flex flex-col items-center gap-7 text-center ${watching ? "" : "sm:flex-row sm:items-center sm:gap-9 sm:text-left"}`}
           >
             {watching && youtubeChannelId ? (
-              <div className="w-full overflow-hidden rounded-[22px] bg-navy-950 ring-1 ring-navy-950/10">
-                <YoutubeWatch channelId={youtubeChannelId} onEnded={broadcastEnded} />
-              </div>
+              liveVideoId ? (
+                <div className="w-full overflow-hidden rounded-[22px] bg-navy-950 ring-1 ring-navy-950/10">
+                  <YoutubeWatch videoId={liveVideoId} onEnded={broadcastEnded} />
+                </div>
+              ) : (
+                // Nothing is being broadcast, so the page says so rather than
+                // showing a player with nothing to play.
+                <div className="flex w-full flex-col items-center gap-3 rounded-[22px] border border-navy-950/[0.08] bg-haze-50 px-6 py-12 text-center">
+                  <p className="font-serif text-xl text-navy-950">No live broadcast right now</p>
+                  <p className="max-w-sm text-sm text-navy-950/55">
+                    The radio plays around the clock. Services appear here while they are being broadcast.
+                  </p>
+                </div>
+              )
             ) : (
               <div className="relative h-[150px] w-[150px] shrink-0 overflow-hidden rounded-[26px] border border-navy-950/[0.08] bg-white shadow-[0_34px_70px_-34px_rgba(15,21,51,0.65)] sm:h-[212px] sm:w-[212px]">
                 <Image src="/logo.png" alt="" fill priority sizes="212px" className="scale-[1.08] object-cover" />
