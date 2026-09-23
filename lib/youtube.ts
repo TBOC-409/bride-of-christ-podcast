@@ -9,6 +9,9 @@
  * air, then embedding that video. YouTube's "whatever is live on this channel"
  * address (embed/live_stream) looks simpler but often answers an embedded
  * player with "An error occurred", so it is not used.
+ *
+ * The live page answers with the newest video when nothing is being broadcast,
+ * so the video is only shown once YouTube itself says it is live right now.
  */
 
 /** The church's channel. Overridden with YOUTUBE_CHANNEL_ID if it ever changes. */
@@ -40,6 +43,23 @@ export function videoEmbedUrl(videoId: string): string {
   return `https://www.youtube.com/embed/${videoId}?rel=0`;
 }
 
+/** YouTube says this of a video that is being broadcast at this moment. */
+const LIVE_NOW = '"isLiveNow":true';
+
+/** Fetches a YouTube page as a viewer's browser would. Null when it cannot. */
+async function fetchPage(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url, {
+      headers: { "User-Agent": VIEWER_AGENT, "Accept-Language": "en" },
+      next: { revalidate: CACHE_SECONDS },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    return response.ok ? await response.text() : null;
+  } catch {
+    return null;
+  }
+}
+
 /** The channel's current broadcast, as YouTube's own live page names it. */
 export function readLiveVideoId(page: string): string | null {
   const canonical = page.match(
@@ -52,20 +72,19 @@ export function readLiveVideoId(page: string): string | null {
 }
 
 /**
- * The video on air right now, or null when nothing is live and when the
- * channel cannot be reached. Never throws: watching is an extra, and a slow
- * answer from YouTube must not hold up the radio.
+ * The video being broadcast at this moment, or null when there is none and
+ * when the channel cannot be reached. Never throws: watching is an extra, and
+ * a slow answer from YouTube must not hold up the radio.
  */
 export async function getLiveVideoId(channelId: string): Promise<string | null> {
-  try {
-    const response = await fetch(liveWatchUrl(channelId), {
-      headers: { "User-Agent": VIEWER_AGENT, "Accept-Language": "en" },
-      next: { revalidate: CACHE_SECONDS },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    if (!response.ok) return null;
-    return readLiveVideoId(await response.text());
-  } catch {
-    return null;
-  }
+  const livePage = await fetchPage(liveWatchUrl(channelId));
+  if (!livePage) return null;
+  const videoId = readLiveVideoId(livePage);
+  if (!videoId) return null;
+  if (livePage.includes(LIVE_NOW)) return videoId;
+
+  // The live page names the newest video when nothing is being broadcast, so
+  // the video's own page decides whether it is live at this moment.
+  const videoPage = await fetchPage(`https://www.youtube.com/watch?v=${videoId}`);
+  return videoPage?.includes(LIVE_NOW) ? videoId : null;
 }
