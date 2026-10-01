@@ -43,10 +43,22 @@ const KEY_PATTERN = /^AIza[0-9A-Za-z_-]{35}$/;
  * mistyped key ("Alza" with a small L, a missing character, a space inside)
  * from one Google has disabled or restricted.
  */
-export function apiKeyShape(): { length: number; startsWithAIza: boolean; looksValid: boolean; hasSpaces: boolean } | null {
+export function apiKeyShape(): {
+  start: string;
+  startCodes: number[];
+  length: number;
+  startsWithAIza: boolean;
+  looksValid: boolean;
+  hasSpaces: boolean;
+} | null {
   const key = apiKey();
   if (!key) return null;
+  // Every Google key opens with the same four characters, so showing them
+  // gives nothing away; their codes expose lookalikes such as l for I.
+  const start = [...key].slice(0, 4);
   return {
+    start: start.join(""),
+    startCodes: start.map((c) => c.codePointAt(0) ?? 0),
     length: key.length,
     startsWithAIza: key.startsWith("AIza"),
     looksValid: KEY_PATTERN.test(key),
