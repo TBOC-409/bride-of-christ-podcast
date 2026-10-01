@@ -57,45 +57,69 @@ export function readLiveFromApi(payload: unknown): string | null {
   return typeof live?.id === "string" ? live.id : null;
 }
 
-async function fetchJson(url: string): Promise<unknown | null> {
+/**
+ * Why a check found no broadcast, so a missing Watch button can be explained
+ * without reading the server's logs.
+ *
+ *   live      a broadcast is on, and its id is given
+ *   none      the check worked and nothing is being broadcast
+ *   no-key    no YOUTUBE_API_KEY is set
+ *   feed      the channel's feed could not be read
+ *   api-NNN   YouTube refused the request with that status: 400 usually
+ *             means a wrong key, 403 that the API is not enabled for it
+ *   api       YouTube could not be reached
+ */
+export type LiveCheck = { videoId: string | null; result: string };
+
+async function fetchJson(url: string): Promise<{ status: number; body: unknown | null }> {
   try {
     const response = await fetch(url, {
       next: { revalidate: CACHE_SECONDS },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    return response.ok ? await response.json() : null;
+    return { status: response.status, body: response.ok ? await response.json() : null };
   } catch {
-    return null;
+    return { status: 0, body: null };
   }
 }
 
-async function fetchFeed(channelId: string): Promise<string[]> {
+async function fetchFeed(channelId: string): Promise<string[] | null> {
   try {
     const response = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`, {
       next: { revalidate: CACHE_SECONDS },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    return response.ok ? readFeedVideoIds(await response.text()) : [];
+    return response.ok ? readFeedVideoIds(await response.text()) : null;
   } catch {
-    return [];
+    return null;
   }
 }
 
 /**
- * The video being broadcast at this moment, or null when there is none, when
- * no API key is set, and when YouTube cannot be reached. Never throws:
- * watching is an extra, and a slow answer must not hold up the radio.
+ * Whether the channel is broadcasting at this moment, and if not, why the
+ * answer is no. Never throws: watching is an extra, and a slow answer must not
+ * hold up the radio. Answers are reused for a couple of minutes however many
+ * listeners ask, which keeps well inside YouTube's daily allowance.
  */
-export async function getLiveVideoId(channelId: string): Promise<string | null> {
+export async function checkLive(channelId: string): Promise<LiveCheck> {
   const key = apiKey();
-  if (!key) return null;
+  if (!key) return { videoId: null, result: "no-key" };
 
-  const ids = (await fetchFeed(channelId)).slice(0, CANDIDATES);
-  if (!ids.length) return null;
+  const ids = await fetchFeed(channelId);
+  if (!ids) return { videoId: null, result: "feed" };
+  if (!ids.length) return { videoId: null, result: "none" };
 
   // One request for all of them: a handful of ids costs the same as one.
-  const payload = await fetchJson(
-    `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${ids.join(",")}&key=${encodeURIComponent(key)}`,
+  const { status, body } = await fetchJson(
+    `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${ids.slice(0, CANDIDATES).join(",")}&key=${encodeURIComponent(key)}`,
   );
-  return readLiveFromApi(payload);
+  if (status === 0) return { videoId: null, result: "api" };
+  if (!body) return { videoId: null, result: `api-${status}` };
+  const videoId = readLiveFromApi(body);
+  return { videoId, result: videoId ? "live" : "none" };
+}
+
+/** The video being broadcast at this moment, or null. */
+export async function getLiveVideoId(channelId: string): Promise<string | null> {
+  return (await checkLive(channelId)).videoId;
 }

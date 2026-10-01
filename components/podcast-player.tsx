@@ -10,6 +10,8 @@ import { YoutubeWatch } from "./youtube-watch";
 
 /** How often "now playing" refreshes while the page is open. */
 const POLL_MS = 20_000;
+/** How often to ask whether a YouTube broadcast has started or stopped. */
+const LIVE_POLL_MS = 60_000;
 /** Reconnection attempts when the stream drops. */
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 3_000;
@@ -98,7 +100,7 @@ export function PodcastPlayer({
   initialStatus,
   stripLines,
   youtubeChannelId,
-  liveVideoId,
+  liveVideoId: initialLiveVideoId,
 }: {
   initialStatus: StreamStatus;
   stripLines: string[];
@@ -107,6 +109,10 @@ export function PodcastPlayer({
   /** The broadcast on air when the page was built, or null when none is. */
   liveVideoId: string | null;
 }) {
+  // Kept current while the page is open: listeners leave the radio running
+  // for hours, and a service that starts after they arrived must still
+  // offer Watch, and stop offering it when it ends.
+  const [liveVideoId, setLiveVideoId] = useState(initialLiveVideoId);
   const audio = useRef<HTMLAudioElement | null>(null);
   /** True from pressing Listen until pressing Stop, so drops can be retried. */
   const wantPlaying = useRef(false);
@@ -144,6 +150,35 @@ export function PodcastPlayer({
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
+
+  useEffect(() => {
+    if (!youtubeChannelId) return;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const response = await fetch("/api/live", { cache: "no-store" });
+        if (!response.ok) return;
+        const { videoId } = (await response.json()) as { videoId: string | null };
+        if (cancelled) return;
+        setLiveVideoId(videoId);
+        // The broadcast ended without the player saying so (a closed tab, a
+        // dropped connection): show the radio again rather than an empty frame.
+        if (!videoId) setMode("listen");
+      } catch {
+        // Keep the last answer; the next check may get through.
+      }
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    const timer = setInterval(refresh, LIVE_POLL_MS);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [youtubeChannelId]);
 
   // Leaving the page closes the connection to the stream.
   useEffect(() => {
