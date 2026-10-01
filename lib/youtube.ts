@@ -30,8 +30,28 @@ export function youtubeChannelId(): string | null {
   return CHANNEL_PATTERN.test(configured) ? configured : null;
 }
 
+/** The key, with any quotation marks or spaces pasted around it removed. */
 function apiKey(): string | null {
-  return process.env.YOUTUBE_API_KEY?.trim() || null;
+  return process.env.YOUTUBE_API_KEY?.trim().replace(/^["']|["']$/g, "").trim() || null;
+}
+
+/** Google API keys are "AIza" followed by 35 letters, digits, dashes or underscores. */
+const KEY_PATTERN = /^AIza[0-9A-Za-z_-]{35}$/;
+
+/**
+ * What the saved key looks like, without revealing it: enough to tell a
+ * mistyped key ("Alza" with a small L, a missing character, a space inside)
+ * from one Google has disabled or restricted.
+ */
+export function apiKeyShape(): { length: number; startsWithAIza: boolean; looksValid: boolean; hasSpaces: boolean } | null {
+  const key = apiKey();
+  if (!key) return null;
+  return {
+    length: key.length,
+    startsWithAIza: key.startsWith("AIza"),
+    looksValid: KEY_PATTERN.test(key),
+    hasSpaces: /\s/.test(key),
+  };
 }
 
 /** Where to watch on YouTube itself, for anyone who would rather. */

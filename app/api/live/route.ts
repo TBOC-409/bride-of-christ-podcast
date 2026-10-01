@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { checkLive, youtubeChannelId } from "@/lib/youtube";
+import { apiKeyShape, checkLive, youtubeChannelId } from "@/lib/youtube";
 
 export const dynamic = "force-dynamic";
 
@@ -15,5 +15,8 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const channelId = youtubeChannelId();
   const check = channelId ? await checkLive(channelId) : { videoId: null, result: "no-channel" };
-  return NextResponse.json(check, { headers: { "Cache-Control": "public, max-age=30" } });
+  // When YouTube refuses the key, say what the saved key looks like (never
+  // the key itself), so a typing slip can be told from a disabled key.
+  const key = check.result.startsWith("api-") ? apiKeyShape() : undefined;
+  return NextResponse.json({ ...check, ...(key ? { key } : {}) }, { headers: { "Cache-Control": "public, max-age=30" } });
 }
